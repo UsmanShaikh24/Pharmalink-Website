@@ -172,32 +172,16 @@ const Layout = ({ children }) => {
             backgroundColor: 'background.paper',
             borderBottom: 1,
             borderColor: 'divider',
+            display: 'flex',
           }}
         >
           <Container maxWidth="xl" sx={{ px: { xs: 1, sm: 2 } }}>
             <Toolbar disableGutters>
-              {/* Logo for desktop */}
-              <Typography
-                variant="h6"
-                noWrap
-                component={RouterLink}
-                to={isAdmin ? '/admin' : '/'}
-                sx={{
-                  mr: 2,
-                  display: { xs: 'none', md: 'flex' },
-                  fontWeight: 700,
-                  color: 'primary.main',
-                  textDecoration: 'none',
-                }}
-              >
-                {isAdmin ? 'Admin Panel' : 'PharmaLink'}
-              </Typography>
-
               {/* Mobile menu icon */}
-              <Box sx={{ flexGrow: 1, display: { xs: 'flex', md: 'none' } }}>
+              <Box sx={{ display: { xs: 'flex', md: 'none' }, mr: 1 }}>
                 <IconButton
                   size="large"
-                  aria-label="account of current user"
+                  aria-label="menu"
                   aria-controls="menu-appbar"
                   aria-haspopup="true"
                   onClick={handleDrawerToggle}
@@ -214,13 +198,29 @@ const Layout = ({ children }) => {
                 component={RouterLink}
                 to={isAdmin ? '/admin' : '/'}
                 sx={{
-                  mr: 2,
                   display: { xs: 'flex', md: 'none' },
                   flexGrow: 1,
                   fontWeight: 700,
                   color: 'primary.main',
                   textDecoration: 'none',
                   fontSize: { xs: '1rem', sm: '1.25rem' },
+                }}
+              >
+                {isAdmin ? 'Admin Panel' : 'PharmaLink'}
+              </Typography>
+
+              {/* Logo for desktop */}
+              <Typography
+                variant="h6"
+                noWrap
+                component={RouterLink}
+                to={isAdmin ? '/admin' : '/'}
+                sx={{
+                  mr: 2,
+                  display: { xs: 'none', md: 'flex' },
+                  fontWeight: 700,
+                  color: 'primary.main',
+                  textDecoration: 'none',
                 }}
               >
                 {isAdmin ? 'Admin Panel' : 'PharmaLink'}
@@ -301,11 +301,15 @@ const Layout = ({ children }) => {
         open={mobileOpen}
         onClose={handleDrawerToggle}
         ModalProps={{
-          keepMounted: true, // Better open performance on mobile
+          keepMounted: true,
         }}
         sx={{
           display: { xs: 'block', md: 'none' },
-          '& .MuiDrawer-paper': { boxSizing: 'border-box', width: 250 },
+          '& .MuiDrawer-paper': { 
+            boxSizing: 'border-box', 
+            width: 250,
+            backgroundColor: 'background.paper',
+          },
         }}
       >
         {drawer}
