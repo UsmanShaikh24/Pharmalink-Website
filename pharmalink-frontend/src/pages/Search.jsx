@@ -60,7 +60,7 @@ import {
   LocalOffer,
   Info,
 } from '@mui/icons-material';
-import axios from 'axios';
+import axiosInstance from '../utils/axios';
 import { useCart } from '../contexts/CartContext';
 
 const Search = () => {
@@ -181,7 +181,7 @@ const Search = () => {
   // Add axios interceptor for authentication
   useEffect(() => {
     // Add request interceptor
-    const requestInterceptor = axios.interceptors.request.use(
+    const requestInterceptor = axiosInstance.interceptors.request.use(
       (config) => {
         // Add token to headers if it exists
         const token = localStorage.getItem('token');
@@ -196,7 +196,7 @@ const Search = () => {
     );
 
     // Add response interceptor to handle 401 errors
-    const responseInterceptor = axios.interceptors.response.use(
+    const responseInterceptor = axiosInstance.interceptors.response.use(
       (response) => response,
       (error) => {
         if (error.response?.status === 401) {
@@ -211,8 +211,8 @@ const Search = () => {
 
     // Cleanup interceptors on component unmount
     return () => {
-      axios.interceptors.request.eject(requestInterceptor);
-      axios.interceptors.response.eject(responseInterceptor);
+      axiosInstance.interceptors.request.eject(requestInterceptor);
+      axiosInstance.interceptors.response.eject(responseInterceptor);
     };
   }, []);
 
@@ -291,11 +291,7 @@ const Search = () => {
       const token = localStorage.getItem('token');
       if (!token) return null;
       
-      const response = await axios.get(`http://localhost:5000/api/pharmacies/${pharmacyId}`, {
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
-      });
+      const response = await axiosInstance.get(`/api/pharmacies/${pharmacyId}`);
       
       return response.data;
     } catch (error) {
@@ -366,7 +362,7 @@ const Search = () => {
 
       // Convert to URLSearchParams and make the request
       const params = new URLSearchParams(requestParams);
-      const response = await axios.get(`http://localhost:5000/api/medicines`, {
+      const response = await axiosInstance.get('/api/medicines', {
         params,
         headers: {
           Authorization: `Bearer ${token}`
@@ -404,7 +400,7 @@ const Search = () => {
       return;
     }
     try {
-      const response = await axios.get('http://localhost:5000/api/medicines/suggestions', {
+      const response = await axiosInstance.get('/api/medicines/suggestions', {
         params: { search: input }
       });
       if (response.data && Array.isArray(response.data.suggestions)) {
@@ -550,11 +546,7 @@ const Search = () => {
       }
 
       console.log("Fetching pharmacies...");
-      const response = await axios.get('http://localhost:5000/api/pharmacies', {
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
-      });
+      const response = await axiosInstance.get('/api/pharmacies');
 
       if (response.data && Array.isArray(response.data)) {
         console.log(`Successfully loaded ${response.data.length} pharmacies:`, 
