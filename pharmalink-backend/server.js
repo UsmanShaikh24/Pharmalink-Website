@@ -14,7 +14,7 @@ const server = http.createServer(app);
 
 // CORS configuration
 const corsOptions = {
-  origin: ['http://localhost:5173', 'https://pharmalink-website.onrender.com'],
+  origin: '*', // Allow all origins temporarily
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Accept', 'Authorization']
@@ -23,7 +23,7 @@ const corsOptions = {
 // Initialize Socket.IO with CORS
 const io = socketio(server, {
   cors: {
-    origin: 'http://localhost:5173',
+    origin: '*', // Allow all origins temporarily
     methods: ['GET', 'POST'],
     credentials: true
   }
@@ -52,6 +52,10 @@ io.on('connection', (socket) => {
 });
 
 // Routes
+app.get('/', (req, res) => {
+  res.json({ message: 'Welcome to Pharmalink API' });
+});
+
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/pharmacies', require('./routes/pharmacies'));
 const medicineRoutes = require('./routes/medicineRoutes');
@@ -68,12 +72,28 @@ app.use('/api/users', userRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(500).json({ message: 'Something went wrong!' });
+  console.error('Error details:', {
+    message: err.message,
+    stack: err.stack,
+    path: req.path,
+    method: req.method
+  });
+  res.status(500).json({ 
+    message: 'Something went wrong!',
+    error: process.env.NODE_ENV === 'development' ? err.message : 'Internal server error'
+  });
+});
+
+// Handle 404 errors
+app.use((req, res) => {
+  console.log('404 Not Found:', req.method, req.path);
+  res.status(404).json({ message: 'Route not found' });
 });
 
 // Start server
 const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
+  console.log('Environment:', process.env.NODE_ENV || 'development');
+  console.log('CORS origin:', corsOptions.origin);
 });
