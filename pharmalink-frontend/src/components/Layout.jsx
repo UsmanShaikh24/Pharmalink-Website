@@ -187,6 +187,12 @@ const Layout = ({ children }) => {
                   aria-haspopup="true"
                   onClick={handleDrawerToggle}
                   color="primary"
+                  disableRipple
+                  sx={{
+                    '&:hover': {
+                      backgroundColor: 'transparent',
+                    }
+                  }}
                 >
                   <MenuIcon />
                 </IconButton>
