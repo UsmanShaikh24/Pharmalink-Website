@@ -14,7 +14,7 @@ const server = http.createServer(app);
 
 // CORS configuration
 const corsOptions = {
-  origin: 'http://localhost:5173', // Frontend URL
+  origin: ['http://localhost:5173', 'https://pharmalink-website.onrender.com'],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Accept', 'Authorization']
