@@ -1,14 +1,55 @@
 #root {
-  max-width: 100%;
+  width: 100%;
   margin: 0 auto;
-  padding: 1rem;
+  padding: 0;
   text-align: center;
+  overflow-x: hidden;
+}
+
+.mobile-container {
+  padding: 1rem;
+}
+
+.hero-section {
+  background-color: #1976d2;
+  color: white;
+  padding: 2rem 1rem;
+  margin: -1rem -1rem 1rem -1rem;
+}
+
+.feature-card {
+  background: white;
+  border-radius: 8px;
+  padding: 1.5rem;
+  margin: 1rem 0;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  cursor: pointer;
+  transition: transform 0.2s;
+}
+
+.feature-card:hover {
+  transform: translateY(-2px);
+}
+
+.feature-icon {
+  font-size: 2rem;
+  margin-bottom: 1rem;
+  color: #1976d2;
 }
 
 @media (min-width: 600px) {
   #root {
     max-width: 1280px;
+    padding: 0;
+  }
+  
+  .mobile-container {
     padding: 2rem;
+  }
+
+  .hero-section {
+    margin: -2rem -2rem 2rem -2rem;
+    padding: 3rem 2rem;
   }
 }
 
