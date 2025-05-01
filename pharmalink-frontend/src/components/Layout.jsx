@@ -120,7 +120,7 @@ const Layout = ({ children }) => {
   const navItems = isAdmin ? adminNavItems : userNavItems;
 
   const drawer = (
-    <Box onClick={handleDrawerToggle} sx={{ textAlign: 'center', width: 250 }}>
+    <Box sx={{ textAlign: 'center', width: 250 }}>
       <Typography variant="h6" sx={{ my: 2, px: 2 }}>
         {isAdmin ? 'Admin Panel' : 'PharmaLink'}
       </Typography>
@@ -132,6 +132,7 @@ const Layout = ({ children }) => {
             component={RouterLink} 
             to={item.path}
             selected={isActivePath(item.path)}
+            onClick={handleDrawerToggle}
             sx={{
               '&.Mui-selected': {
                 backgroundColor: 'primary.light',
