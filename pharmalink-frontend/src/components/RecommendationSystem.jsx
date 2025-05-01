@@ -37,7 +37,7 @@ import {
   LocationOn as LocationIcon,
   Store as StoreIcon
 } from '@mui/icons-material';
-import axios from 'axios';
+import axiosInstance from '../utils/axios';
 import debounce from 'lodash/debounce';
 
 // Common symptoms and conditions for autocomplete
@@ -82,8 +82,7 @@ const RecommendationSystem = () => {
         return;
       }
 
-      const baseURL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
-      const response = await axios.get(`${baseURL}/api/medicines/suggestions`, {
+      const response = await axiosInstance.get('/api/medicines/suggestions', {
         params: {
           search: searchText
         },
@@ -136,8 +135,7 @@ const RecommendationSystem = () => {
           return;
         }
 
-        const baseURL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
-        const response = await axios.get(`${baseURL}/api/medicines/suggestions`, {
+        const response = await axiosInstance.get('/api/medicines/suggestions', {
           params: {
             search: ''
           },
@@ -193,7 +191,7 @@ const RecommendationSystem = () => {
       };
 
       // Get medicine recommendations
-      const medicineResponse = await axios.post(
+      const medicineResponse = await axiosInstance.post(
         '/api/recommendations/medicines',
         {
           ...formData,
@@ -212,7 +210,7 @@ const RecommendationSystem = () => {
       setRecommendations(recommendationsData);
 
       // Get health tips
-      const tipsResponse = await axios.post(
+      const tipsResponse = await axiosInstance.post(
         '/api/recommendations/health-tips',
         {
           conditions: formData.conditions,
