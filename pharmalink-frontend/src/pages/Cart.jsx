@@ -45,7 +45,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { useCart } from '../contexts/CartContext';
 import { useAuth } from '../contexts/AuthContext';
-import axios from 'axios';
+import axiosInstance from '../utils/axios';
 import { loadGoogleMaps } from '../utils/googleMaps';
 
 const deliveryOptions = [
@@ -407,12 +407,7 @@ const Cart = () => {
         paymentMethod: 'cod'
       };
 
-      const response = await axios.post('http://localhost:5000/api/orders', orderData, {
-        headers: { 
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
+      const response = await axiosInstance.post('/api/orders', orderData);
 
       // Clear cart after successful order
       clearCart();
