@@ -163,40 +163,45 @@ const Layout = ({ children }) => {
         flexDirection: 'column',
         minHeight: '100vh',
         backgroundColor: 'background.default',
+        width: '100%',
+        overflowX: 'hidden',
       }}
     >
       {!isAdminLoginPage && (
         <AppBar 
-          position="sticky" 
-          elevation={0}
+          position="fixed"
+          elevation={1}
           sx={{
             backgroundColor: 'background.paper',
             borderBottom: 1,
             borderColor: 'divider',
-            display: 'flex',
           }}
         >
           <Container maxWidth="xl" sx={{ px: { xs: 1, sm: 2 } }}>
-            <Toolbar disableGutters>
+            <Toolbar 
+              disableGutters 
+              sx={{ 
+                minHeight: { xs: '56px' },
+                justifyContent: 'space-between'
+              }}
+            >
               {/* Mobile menu icon */}
-              <Box sx={{ display: { xs: 'flex', md: 'none' }, mr: 1 }}>
-                <IconButton
-                  size="large"
-                  aria-label="menu"
-                  aria-controls="menu-appbar"
-                  aria-haspopup="true"
-                  onClick={handleDrawerToggle}
-                  color="primary"
-                  disableRipple
-                  sx={{
-                    '&:hover': {
-                      backgroundColor: 'transparent',
-                    }
-                  }}
-                >
-                  <MenuIcon />
-                </IconButton>
-              </Box>
+              <IconButton
+                size="medium"
+                edge="start"
+                aria-label="menu"
+                onClick={handleDrawerToggle}
+                sx={{
+                  color: 'primary.main',
+                  display: { xs: 'flex', md: 'none' },
+                  mr: 1,
+                  '&:hover': {
+                    backgroundColor: 'rgba(25, 118, 210, 0.04)',
+                  },
+                }}
+              >
+                <MenuIcon />
+              </IconButton>
 
               {/* Logo for mobile */}
               <Typography
@@ -206,11 +211,11 @@ const Layout = ({ children }) => {
                 to={isAdmin ? '/admin' : '/'}
                 sx={{
                   display: { xs: 'flex', md: 'none' },
-                  flexGrow: 1,
                   fontWeight: 700,
                   color: 'primary.main',
                   textDecoration: 'none',
-                  fontSize: { xs: '1rem', sm: '1.25rem' },
+                  fontSize: { xs: '1.1rem', sm: '1.25rem' },
+                  flexGrow: 0,
                 }}
               >
                 {isAdmin ? 'Admin Panel' : 'PharmaLink'}
@@ -256,12 +261,14 @@ const Layout = ({ children }) => {
               </Box>
 
               {/* User menu */}
-              <Box sx={{ flexGrow: 0 }}>
+              <Box sx={{ ml: { xs: 1, md: 2 } }}>
                 {isAuthenticated ? (
                   <>
                     <Tooltip title="Open settings">
                       <IconButton onClick={handleOpenUserMenu} sx={{ p: 0 }}>
-                        <Avatar>{user?.name?.[0]?.toUpperCase() || 'U'}</Avatar>
+                        <Avatar sx={{ bgcolor: 'primary.main' }}>
+                          {user?.name?.[0]?.toUpperCase() || 'U'}
+                        </Avatar>
                       </IconButton>
                     </Tooltip>
                     <Menu
@@ -291,7 +298,7 @@ const Layout = ({ children }) => {
                     to="/login"
                     color="primary"
                     variant="contained"
-                    sx={{ ml: 2 }}
+                    size="medium"
                   >
                     Login
                   </Button>
@@ -316,6 +323,7 @@ const Layout = ({ children }) => {
             boxSizing: 'border-box', 
             width: 250,
             backgroundColor: 'background.paper',
+            mt: '56px', // Match the AppBar height
           },
         }}
       >
@@ -326,13 +334,13 @@ const Layout = ({ children }) => {
         component="main"
         sx={{
           flexGrow: 1,
-          p: { xs: 1, sm: 2 },
           width: '100%',
-          maxWidth: '100%',
-          overflowX: 'hidden',
+          mt: '56px', // Match the AppBar height
         }}
       >
-        {children}
+        <div className="mobile-container">
+          {children}
+        </div>
       </Box>
 
       {!isAdmin && (
