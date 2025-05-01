@@ -14,7 +14,13 @@ const server = http.createServer(app);
 
 // CORS configuration
 const corsOptions = {
-  origin: '*', // Allow all origins temporarily
+  origin: [
+    'http://localhost:5173',
+    'http://localhost:3000',
+    'https://pharmalink-website.onrender.com',
+    'https://pharmalink-website.vercel.app',
+    'https://usman-shaikhs-projects-175ba592.vercel.app'
+  ],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Accept', 'Authorization']
@@ -23,7 +29,13 @@ const corsOptions = {
 // Initialize Socket.IO with CORS
 const io = socketio(server, {
   cors: {
-    origin: '*', // Allow all origins temporarily
+    origin: [
+      'http://localhost:5173',
+      'http://localhost:3000',
+      'https://pharmalink-website.onrender.com',
+      'https://pharmalink-website.vercel.app',
+      'https://usman-shaikhs-projects-175ba592.vercel.app'
+    ],
     methods: ['GET', 'POST'],
     credentials: true
   }
