@@ -185,7 +185,7 @@ const Layout = ({ children }) => {
                   aria-controls="menu-appbar"
                   aria-haspopup="true"
                   onClick={handleDrawerToggle}
-                  color="inherit"
+                  color="primary"
                 >
                   <MenuIcon />
                 </IconButton>
@@ -254,7 +254,7 @@ const Layout = ({ children }) => {
                   <>
                     <Tooltip title="Open settings">
                       <IconButton onClick={handleOpenUserMenu} sx={{ p: 0 }}>
-                        <Avatar alt={user?.name} src={user?.avatar} />
+                        <Avatar>{user?.name?.[0]?.toUpperCase() || 'U'}</Avatar>
                       </IconButton>
                     </Tooltip>
                     <Menu
