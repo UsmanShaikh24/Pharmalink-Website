@@ -120,8 +120,8 @@ const Layout = ({ children }) => {
   const navItems = isAdmin ? adminNavItems : userNavItems;
 
   const drawer = (
-    <Box onClick={handleDrawerToggle} sx={{ textAlign: 'center' }}>
-      <Typography variant="h6" sx={{ my: 2 }}>
+    <Box onClick={handleDrawerToggle} sx={{ textAlign: 'center', width: 250 }}>
+      <Typography variant="h6" sx={{ my: 2, px: 2 }}>
         {isAdmin ? 'Admin Panel' : 'PharmaLink'}
       </Typography>
       <Divider />
@@ -140,9 +140,12 @@ const Layout = ({ children }) => {
                   color: 'primary.main',
                 },
               },
+              '&:hover': {
+                backgroundColor: 'action.hover',
+              },
             }}
           >
-            <ListItemIcon>
+            <ListItemIcon sx={{ minWidth: 40 }}>
               {item.icon}
             </ListItemIcon>
             <ListItemText primary={item.label} />
@@ -171,7 +174,7 @@ const Layout = ({ children }) => {
             borderColor: 'divider',
           }}
         >
-          <Container maxWidth="xl">
+          <Container maxWidth="xl" sx={{ px: { xs: 1, sm: 2 } }}>
             <Toolbar disableGutters>
               {/* Logo for desktop */}
               <Typography
@@ -217,6 +220,7 @@ const Layout = ({ children }) => {
                   fontWeight: 700,
                   color: 'primary.main',
                   textDecoration: 'none',
+                  fontSize: { xs: '1rem', sm: '1.25rem' },
                 }}
               >
                 {isAdmin ? 'Admin Panel' : 'PharmaLink'}
@@ -250,7 +254,7 @@ const Layout = ({ children }) => {
                   <>
                     <Tooltip title="Open settings">
                       <IconButton onClick={handleOpenUserMenu} sx={{ p: 0 }}>
-                        <Avatar>{user?.name?.[0] || 'U'}</Avatar>
+                        <Avatar alt={user?.name} src={user?.avatar} />
                       </IconButton>
                     </Tooltip>
                     <Menu
@@ -275,22 +279,15 @@ const Layout = ({ children }) => {
                     </Menu>
                   </>
                 ) : (
-                  location.pathname !== '/login' && (
-                    <Button
-                      component={RouterLink}
-                      to="/login"
-                      variant="contained"
-                      color="primary"
-                      sx={{
-                        backgroundColor: isActivePath('/login') ? 'primary.dark' : 'primary.main',
-                        '&:hover': {
-                          backgroundColor: 'primary.dark',
-                        },
-                      }}
-                    >
-                      Login
-                    </Button>
-                  )
+                  <Button
+                    component={RouterLink}
+                    to="/login"
+                    color="primary"
+                    variant="contained"
+                    sx={{ ml: 2 }}
+                  >
+                    Login
+                  </Button>
                 )}
               </Box>
             </Toolbar>
@@ -298,33 +295,30 @@ const Layout = ({ children }) => {
         </AppBar>
       )}
 
-      <Box component="nav">
-        <Drawer
-          variant="temporary"
-          open={mobileOpen}
-          onClose={handleDrawerToggle}
-          ModalProps={{
-            keepMounted: true,
-          }}
-          sx={{
-            display: { xs: 'block', md: 'none' },
-            '& .MuiDrawer-paper': { 
-              boxSizing: 'border-box', 
-              width: 240,
-              backgroundColor: 'background.paper',
-            },
-          }}
-        >
-          {drawer}
-        </Drawer>
-      </Box>
+      <Drawer
+        variant="temporary"
+        anchor="left"
+        open={mobileOpen}
+        onClose={handleDrawerToggle}
+        ModalProps={{
+          keepMounted: true, // Better open performance on mobile
+        }}
+        sx={{
+          display: { xs: 'block', md: 'none' },
+          '& .MuiDrawer-paper': { boxSizing: 'border-box', width: 250 },
+        }}
+      >
+        {drawer}
+      </Drawer>
 
       <Box
         component="main"
         sx={{
           flexGrow: 1,
+          p: { xs: 1, sm: 2 },
           width: '100%',
-          backgroundColor: 'background.default',
+          maxWidth: '100%',
+          overflowX: 'hidden',
         }}
       >
         {children}
