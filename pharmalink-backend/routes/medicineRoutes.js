@@ -35,6 +35,7 @@ const stockUpdateValidation = [
 // Public routes
 router.get('/suggestions', medicineController.getMedicineSuggestions);
 router.get('/detail/:id', medicineController.getMedicineById);
+router.get('/browse', medicineController.getMedicines); // Public browsing endpoint
 
 // Authenticated user routes
 router.get('/', auth, medicineController.getMedicines);
