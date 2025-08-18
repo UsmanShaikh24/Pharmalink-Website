@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate, Link as RouterLink } from 'react-router-dom';
+import { useNavigate, Link as RouterLink, useLocation } from 'react-router-dom';
 import {
   Box,
   Container,
@@ -13,6 +13,11 @@ import {
   InputAdornment,
   IconButton,
   useTheme,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  DialogContentText,
 } from '@mui/material';
 import {
   Visibility,
@@ -21,6 +26,7 @@ import {
   Lock,
   AdminPanelSettings,
 } from '@mui/icons-material';
+import { CircularProgress } from '@mui/material';
 import { useAuth } from '../contexts/AuthContext';
 
 const Login = () => {
@@ -30,8 +36,14 @@ const Login = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [loginSuccessDialogOpen, setLoginSuccessDialogOpen] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
   const { login } = useAuth();
+  
+  // Get redirect path and message from location state
+  const from = location.state?.from || '/';
+  const message = location.state?.message;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -39,12 +51,17 @@ const Login = () => {
       setError('');
       setLoading(true);
       await login(email, password);
-      navigate('/');
+      setLoginSuccessDialogOpen(true);
     } catch (err) {
       setError('Failed to sign in. Please check your credentials.');
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleLoginSuccessClose = () => {
+    setLoginSuccessDialogOpen(false);
+    navigate(from);
   };
 
   return (
@@ -80,6 +97,12 @@ const Login = () => {
         >
           Sign in to continue to PharmaLink
         </Typography>
+        
+        {message && (
+          <Alert severity="info" sx={{ width: '100%', mb: 3 }}>
+            {message}
+          </Alert>
+        )}
 
         {error && (
           <Alert severity="error" sx={{ width: '100%', mb: 3 }}>
@@ -144,6 +167,7 @@ const Login = () => {
             fullWidth
             variant="contained"
             disabled={loading}
+            startIcon={loading ? <CircularProgress size={20} color="inherit" /> : null}
             sx={{
               mt: 3,
               mb: 2,
@@ -195,6 +219,28 @@ const Login = () => {
           </Button>
         </Box>
       </Paper>
+
+      {/* Login Success Dialog */}
+      <Dialog
+        open={loginSuccessDialogOpen}
+        onClose={handleLoginSuccessClose}
+        aria-labelledby="login-success-dialog-title"
+        aria-describedby="login-success-dialog-description"
+      >
+        <DialogTitle id="login-success-dialog-title" sx={{ textAlign: 'center' }}>
+          ✅ Login Successful
+        </DialogTitle>
+        <DialogContent>
+          <DialogContentText id="login-success-dialog-description" sx={{ textAlign: 'center' }}>
+            Welcome back! You have been successfully logged in to PharmaLink.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions sx={{ justifyContent: 'center' }}>
+          <Button onClick={handleLoginSuccessClose} color="primary" variant="contained">
+            Continue
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Container>
   );
 };
