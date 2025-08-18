@@ -60,7 +60,7 @@ import {
   LocalOffer,
   Info,
 } from '@mui/icons-material';
-import axiosInstance from '../utils/axios';
+import axios from 'axios';
 import { useCart } from '../contexts/CartContext';
 
 const Search = () => {
@@ -181,7 +181,7 @@ const Search = () => {
   // Add axios interceptor for authentication
   useEffect(() => {
     // Add request interceptor
-    const requestInterceptor = axiosInstance.interceptors.request.use(
+    const requestInterceptor = axios.interceptors.request.use(
       (config) => {
         // Add token to headers if it exists
         const token = localStorage.getItem('token');
@@ -196,7 +196,7 @@ const Search = () => {
     );
 
     // Add response interceptor to handle 401 errors
-    const responseInterceptor = axiosInstance.interceptors.response.use(
+    const responseInterceptor = axios.interceptors.response.use(
       (response) => response,
       (error) => {
         if (error.response?.status === 401) {
@@ -211,8 +211,8 @@ const Search = () => {
 
     // Cleanup interceptors on component unmount
     return () => {
-      axiosInstance.interceptors.request.eject(requestInterceptor);
-      axiosInstance.interceptors.response.eject(responseInterceptor);
+      axios.interceptors.request.eject(requestInterceptor);
+      axios.interceptors.response.eject(responseInterceptor);
     };
   }, []);
 
@@ -291,7 +291,11 @@ const Search = () => {
       const token = localStorage.getItem('token');
       if (!token) return null;
       
-      const response = await axiosInstance.get(`/api/pharmacies/${pharmacyId}`);
+      const response = await axios.get(`http://localhost:5000/api/pharmacies/${pharmacyId}`, {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
       
       return response.data;
     } catch (error) {
@@ -309,9 +313,9 @@ const Search = () => {
       // Check for authentication
       const token = localStorage.getItem('token');
       if (!token) {
-        setError('Please log in to search medicines');
-        window.location.href = '/login';
-        return;
+        // For non-authenticated users, we'll load medicines without authentication
+        // but with limited functionality
+        console.log('No token found - loading medicines for guest users');
       }
 
       // Create params object
@@ -362,11 +366,21 @@ const Search = () => {
 
       // Convert to URLSearchParams and make the request
       const params = new URLSearchParams(requestParams);
-      const response = await axiosInstance.get('/api/medicines', {
+      
+      // Use different endpoints based on authentication status
+      let endpoint = 'http://localhost:5000/api/medicines';
+      const headers = {};
+      
+      if (token) {
+        headers.Authorization = `Bearer ${token}`;
+      } else {
+        // Use public endpoint for non-authenticated users
+        endpoint = 'http://localhost:5000/api/medicines/browse';
+      }
+      
+      const response = await axios.get(endpoint, {
         params,
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
+        headers
       });
 
       console.log('API Response:', response.data);
@@ -375,7 +389,11 @@ const Search = () => {
     } catch (error) {
       console.error('Error loading medicines:', error);
       if (error.response?.status === 401) {
-        setError('Please log in to search medicines');
+        if (token) {
+          setError('Please log in to search medicines');
+        } else {
+          setError('Some features require login. You can still browse medicines.');
+        }
       } else if (error.response?.status === 400) {
         // Handle bad request errors more gracefully
         console.error('Bad request error details:', error.response?.data);
@@ -400,7 +418,7 @@ const Search = () => {
       return;
     }
     try {
-      const response = await axiosInstance.get('/api/medicines/suggestions', {
+      const response = await axios.get('http://localhost:5000/api/medicines/suggestions', {
         params: { search: input }
       });
       if (response.data && Array.isArray(response.data.suggestions)) {
@@ -540,13 +558,28 @@ const Search = () => {
     try {
       setPharmaciesLoading(true);
       const token = localStorage.getItem('token');
-      if (!token) {
-        setError('Please log in to search medicines');
-        return;
-      }
-
+      
+      // Load pharmacies for both authenticated and guest users
       console.log("Fetching pharmacies...");
-      const response = await axiosInstance.get('/api/pharmacies');
+      
+      let response;
+      if (token) {
+        // Authenticated users get full pharmacy data
+        response = await axios.get('http://localhost:5000/api/pharmacies', {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        });
+      } else {
+        // Guest users get public pharmacy data
+        try {
+          response = await axios.get('http://localhost:5000/api/pharmacies/public');
+        } catch (error) {
+          // If public endpoint doesn't exist, fall back to main endpoint
+          console.log("Public endpoint not available, trying main endpoint");
+          response = await axios.get('http://localhost:5000/api/pharmacies');
+        }
+      }
 
       if (response.data && Array.isArray(response.data)) {
         console.log(`Successfully loaded ${response.data.length} pharmacies:`, 
@@ -558,6 +591,11 @@ const Search = () => {
       }
     } catch (error) {
       console.error('Error loading pharmacies:', error);
+      // For guest users, if the public endpoint doesn't exist, we'll fall back gracefully
+      if (!localStorage.getItem('token')) {
+        console.log("Public pharmacy endpoint not available, continuing without pharmacy filtering");
+        setPharmacies([]);
+      }
     } finally {
       setPharmaciesLoading(false);
     }
