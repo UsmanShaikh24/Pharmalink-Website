@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Box,
   Container,
@@ -20,8 +20,6 @@ import {
   Paper,
   Chip,
   Snackbar,
-  Autocomplete,
-  CircularProgress,
   InputAdornment,
   List,
   ListItem,
@@ -45,8 +43,8 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { useCart } from '../contexts/CartContext';
 import { useAuth } from '../contexts/AuthContext';
-import axiosInstance from '../utils/axios';
-import { loadGoogleMaps } from '../utils/googleMaps';
+import axios from 'axios';
+import CheckoutLogin from '../components/CheckoutLogin';
 
 const deliveryOptions = [
   {
@@ -97,69 +95,9 @@ const Cart = () => {
     message: '',
     severity: 'success'
   });
-  const [placesService, setPlacesService] = useState(null);
-  const [addressPredictions, setAddressPredictions] = useState([]);
-  const [addressLoading, setAddressLoading] = useState(false);
-  const [addressInput, setAddressInput] = useState('');
-  const [scriptLoaded, setScriptLoaded] = useState(false);
-  const [scriptError, setScriptError] = useState(null);
-  const mapRef = useRef(null);
-  const scriptRef = useRef(null);
   const navigate = useNavigate();
 
-  // Initialize Google Maps API
-  useEffect(() => {
-    let isMounted = true;
 
-    const initializePlacesService = () => {
-      if (!window.google?.maps?.places) {
-        setScriptError('Google Maps Places API failed to load');
-        return;
-      }
-
-      try {
-        if (!mapRef.current) {
-          mapRef.current = document.createElement('div');
-        }
-
-        const autocompleteService = new window.google.maps.places.AutocompleteService();
-        const placesService = new window.google.maps.places.PlacesService(mapRef.current);
-
-        if (isMounted) {
-          setPlacesService({
-            autocomplete: autocompleteService,
-            places: placesService
-          });
-          setScriptLoaded(true);
-          setScriptError(null);
-        }
-      } catch (error) {
-        console.error('Error initializing Places service:', error);
-        if (isMounted) {
-          setScriptError('Failed to initialize Places service');
-        }
-      }
-    };
-
-    const loadMapsLibrary = async () => {
-      try {
-        await loadGoogleMaps();
-        initializePlacesService();
-      } catch (error) {
-        console.error('Error loading Google Maps:', error);
-        setScriptError('Failed to load Google Maps. Please check your internet connection.');
-      }
-    };
-
-    loadMapsLibrary();
-
-    return () => {
-      isMounted = false;
-      if (mapRef.current) {
-        mapRef.current = null;
-      }
-    };
-  }, []);
 
   useEffect(() => {
     // Set default address if available and only if no address is currently selected
@@ -232,85 +170,7 @@ const Cart = () => {
     });
   };
 
-  const handleAddressSelect = (prediction) => {
-    if (!prediction?.place_id || !placesService?.places) return;
 
-    setAddressLoading(true);
-    placesService.places.getDetails(
-      {
-        placeId: prediction.place_id,
-        fields: ['address_components', 'formatted_address', 'geometry'],
-      },
-      (place, status) => {
-        setAddressLoading(false);
-        if (status === 'OK' && place) {
-          const addressComponents = place.address_components || [];
-          
-          // Extract address components for Indian format
-          const streetNumber = addressComponents.find(c => c.types.includes('street_number'))?.long_name || '';
-          const route = addressComponents.find(c => c.types.includes('route'))?.long_name || '';
-          const sublocality = addressComponents.find(c => c.types.includes('sublocality_level_1'))?.long_name || '';
-          const locality = addressComponents.find(c => c.types.includes('locality'))?.long_name || '';
-          const city = addressComponents.find(c => 
-            c.types.includes('administrative_area_level_2') || 
-            c.types.includes('locality')
-          )?.long_name || '';
-          const state = addressComponents.find(c => c.types.includes('administrative_area_level_1'))?.long_name || '';
-          const pinCode = addressComponents.find(c => c.types.includes('postal_code'))?.long_name || '';
-
-          // Combine street address components
-          const street = [route, sublocality, locality]
-            .filter(Boolean)
-            .join(', ');
-
-          const finalStreet = street || place.formatted_address || '';
-
-          setAddressInput(finalStreet);
-          setDeliveryAddress(prev => ({
-            ...prev,
-            street: finalStreet,
-            city,
-            state,
-            zipCode: pinCode
-          }));
-          setAddressPredictions([]);
-
-          // Mark fields as touched
-          setTouched(prev => ({
-            ...prev,
-            street: true,
-            city: true,
-            state: true,
-            zipCode: true
-          }));
-        }
-      }
-    );
-  };
-
-  const handleAddressSearch = (value) => {
-    setAddressInput(value);
-    
-    if (!value || !placesService?.autocomplete) {
-      setAddressPredictions([]);
-      return;
-    }
-
-    placesService.autocomplete.getPlacePredictions(
-      {
-        input: value,
-        componentRestrictions: { country: 'IN' },
-        types: ['geocode', 'establishment'],
-      },
-      (predictions, status) => {
-        if (status === 'OK' && predictions && predictions.length > 0) {
-          setAddressPredictions(predictions);
-        } else {
-          setAddressPredictions([]);
-        }
-      }
-    );
-  };
 
   const steps = ['Cart Review', 'Delivery Address', 'Delivery Options', 'Payment'];
 
@@ -380,6 +240,18 @@ const Cart = () => {
       }
 
       const token = localStorage.getItem('token');
+      
+      // Debug logging
+      console.log('Token:', token);
+      console.log('User:', user);
+      console.log('Cart items:', cartItems);
+      console.log('Delivery address:', deliveryAddress);
+      
+      if (!token) {
+        setError('Please login to place an order');
+        return;
+      }
+
       const subtotal = calculateSubtotal();
       const tax = calculateTax(subtotal);
       const deliveryFee = getDeliveryFee();
@@ -397,7 +269,7 @@ const Cart = () => {
           state: deliveryAddress.state,
           zipCode: deliveryAddress.zipCode,
           coordinates: {
-            latitude: 0, // You might want to get these from the Google Places API
+            latitude: 0, // Default coordinates since we removed Google Maps
             longitude: 0
           }
         },
@@ -407,7 +279,14 @@ const Cart = () => {
         paymentMethod: 'cod'
       };
 
-      const response = await axiosInstance.post('/api/orders', orderData);
+      console.log('Order data being sent:', orderData);
+
+      const response = await axios.post('http://localhost:5000/api/orders', orderData, {
+        headers: { 
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
 
       // Clear cart after successful order
       clearCart();
@@ -425,7 +304,23 @@ const Cart = () => {
       }, 2000);
     } catch (error) {
       console.error('Error placing order:', error);
-      const errorMessage = error.response?.data?.message || error.response?.data?.error || 'Failed to place order. Please try again.';
+      console.error('Error response:', error.response);
+      console.error('Error status:', error.response?.status);
+      console.error('Error data:', error.response?.data);
+      
+      let errorMessage = 'Failed to place order. Please try again.';
+      
+      if (error.response?.data?.errors) {
+        // Handle validation errors
+        errorMessage = error.response.data.errors.map(err => err.msg).join(', ');
+      } else if (error.response?.data?.error) {
+        errorMessage = error.response.data.error;
+      } else if (error.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
       setError(errorMessage);
       setSnackbar({
         open: true,
@@ -565,7 +460,7 @@ const Cart = () => {
                     sx={{ mt: 2 }}
                     disabled={cartItems.length === 0}
                   >
-                    Continue to Delivery
+                    {user ? 'Continue to Delivery' : 'Login to Continue'}
                   </Button>
                   <Button
                     fullWidth
@@ -701,80 +596,24 @@ const Cart = () => {
                     />
                   </Grid>
                   <Grid item xs={12}>
-                    {scriptError ? (
-                      <Alert severity="error" sx={{ mb: 2 }}>
-                        {scriptError}
-                      </Alert>
-                    ) : (
-                      <Autocomplete
-                        freeSolo
-                        options={addressPredictions}
-                        getOptionLabel={(option) => 
-                          typeof option === 'string' ? option : option.description
-                        }
-                        value={addressInput}
-                        onChange={(_, newValue) => {
-                          if (typeof newValue === 'string') {
-                            setAddressInput(newValue);
-                            setDeliveryAddress(prev => ({ ...prev, street: newValue }));
-                          } else if (newValue) {
-                            handleAddressSelect(newValue);
-                          }
-                        }}
-                        onInputChange={(_, newValue, reason) => {
-                          if (reason === 'input') {
-                            handleAddressSearch(newValue);
-                          }
-                        }}
-                        loading={addressLoading}
-                        loadingText="Searching addresses..."
-                        noOptionsText="No addresses found"
-                        renderOption={(props, option) => {
-                          const { key, ...otherProps } = props;
-                          return (
-                            <li key={option.place_id} {...otherProps}>
-                              <Box sx={{ display: 'flex', alignItems: 'flex-start' }}>
-                                <LocationOn sx={{ mt: 0.5, mr: 1, color: 'text.secondary' }} />
-                                <Box>
-                                  <Typography variant="body1">
-                                    {option.structured_formatting?.main_text || option.description}
-                                  </Typography>
-                                  <Typography variant="caption" color="text.secondary">
-                                    {option.structured_formatting?.secondary_text}
-                                  </Typography>
-                                </Box>
-                              </Box>
-                            </li>
-                          );
-                        }}
-                        renderInput={(params) => (
-                          <TextField
-                            {...params}
-                            label="Street Address"
-                            required
-                            error={touched.street && !deliveryAddress.street.trim()}
-                            helperText={touched.street && !deliveryAddress.street.trim() ? 'Street address is required' : 'Search and select your street address'}
-                            placeholder="Type to search your address"
-                            InputProps={{
-                              ...params.InputProps,
-                              startAdornment: (
-                                <InputAdornment position="start">
-                                  <LocationOn />
-                                </InputAdornment>
-                              ),
-                              endAdornment: (
-                                <>
-                                  {addressLoading ? (
-                                    <CircularProgress color="inherit" size={20} />
-                                  ) : null}
-                                  {params.InputProps.endAdornment}
-                                </>
-                              ),
-                            }}
-                          />
-                        )}
-                      />
-                    )}
+                    <TextField
+                      fullWidth
+                      label="Street Address"
+                      value={deliveryAddress.street}
+                      onChange={handleAddressChange('street')}
+                      onBlur={handleBlur('street')}
+                      required
+                      error={touched.street && !deliveryAddress.street.trim()}
+                      helperText={touched.street && !deliveryAddress.street.trim() ? 'Street address is required' : 'Enter your street address'}
+                      placeholder="Enter your street address"
+                      InputProps={{
+                        startAdornment: (
+                          <InputAdornment position="start">
+                            <LocationOn />
+                          </InputAdornment>
+                        ),
+                      }}
+                    />
                   </Grid>
                   <Grid item xs={12}>
                     <TextField
@@ -1070,6 +909,24 @@ const Cart = () => {
   };
 
   const renderStepContent = (step) => {
+    // Check if user is authenticated when trying to proceed to checkout steps
+    if (step > 0 && !user) {
+      return (
+        <CheckoutLogin
+          onProceedToLogin={() => {
+            navigate('/login', { 
+              state: { 
+                from: '/cart',
+                message: 'Please login to complete your order'
+              } 
+            });
+          }}
+          cartItemsCount={cartItems.length}
+          totalAmount={calculateTotal()}
+        />
+      );
+    }
+
     switch (step) {
       case 0:
         return renderCartItems();
