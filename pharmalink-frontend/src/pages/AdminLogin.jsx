@@ -21,6 +21,7 @@ import {
   Lock,
 } from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext';
+import axios from 'axios';
 
 const AdminLogin = () => {
   const theme = useTheme();
