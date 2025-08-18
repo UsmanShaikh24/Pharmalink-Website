@@ -21,6 +21,11 @@ import {
   useTheme,
   useMediaQuery,
   Badge,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  DialogContentText,
 } from '@mui/material';
 import {
   Menu as MenuIcon,
@@ -42,13 +47,15 @@ const Layout = ({ children }) => {
   const [anchorElNav, setAnchorElNav] = useState(null);
   const [anchorElUser, setAnchorElUser] = useState(null);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [logoutDialogOpen, setLogoutDialogOpen] = useState(false);
+  const [logoutSuccessDialogOpen, setLogoutSuccessDialogOpen] = useState(false);
   const { isAuthenticated, user, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const isAdmin = user?.isAdmin;
-  const { cartItems } = useCart();
+  const { cartItems, clearCart } = useCart();
 
   // Debug log to verify pathname and authentication status
   console.log('Current pathname:', location.pathname);
@@ -79,10 +86,34 @@ const Layout = ({ children }) => {
     setMobileOpen(!mobileOpen);
   };
 
-  const handleLogout = () => {
-    logout();
+  const handleLogoutClick = () => {
+    setLogoutDialogOpen(true);
     handleCloseUserMenu();
-    navigate('/');
+  };
+
+  const handleLogoutConfirm = () => {
+    // Clear cart context to remove cart items
+    clearCart();
+    
+    // Logout user and clear all stored data
+    logout();
+    
+    // Close the confirmation dialog
+    setLogoutDialogOpen(false);
+    
+    // Show logout success dialog
+    setLogoutSuccessDialogOpen(true);
+  };
+
+  const handleLogoutCancel = () => {
+    setLogoutDialogOpen(false);
+  };
+
+  const handleLogoutSuccessClose = () => {
+    setLogoutSuccessDialogOpen(false);
+    // Force a complete page refresh to clear all React state and show fresh website
+    // This ensures no user data remains visible after logout
+    window.location.href = '/';
   };
 
   // Admin navigation items
@@ -97,8 +128,6 @@ const Layout = ({ children }) => {
     ...((isAuthenticated || !['/login', '/register', '/admin/login'].includes(location.pathname)) ? [
       { path: '/', icon: <Home />, label: 'Home' },
       { path: '/search', icon: <Search />, label: 'Search' },
-    ] : []),
-    ...(isAuthenticated ? [
       { path: '/recommendations', icon: <SmartToy />, label: 'AI Suggest' },
       { 
         path: '/cart', 
@@ -109,6 +138,8 @@ const Layout = ({ children }) => {
         ), 
         label: 'Cart' 
       },
+    ] : []),
+    ...(isAuthenticated ? [
       { path: '/orders', icon: <LocalPharmacy />, label: 'Orders' },
       { path: '/profile', icon: <Person />, label: 'Profile' },
     ] : []),
@@ -120,8 +151,8 @@ const Layout = ({ children }) => {
   const navItems = isAdmin ? adminNavItems : userNavItems;
 
   const drawer = (
-    <Box sx={{ textAlign: 'center', width: 250 }}>
-      <Typography variant="h6" sx={{ my: 2, px: 2 }}>
+    <Box onClick={handleDrawerToggle} sx={{ textAlign: 'center' }}>
+      <Typography variant="h6" sx={{ my: 2 }}>
         {isAdmin ? 'Admin Panel' : 'PharmaLink'}
       </Typography>
       <Divider />
@@ -132,7 +163,6 @@ const Layout = ({ children }) => {
             component={RouterLink} 
             to={item.path}
             selected={isActivePath(item.path)}
-            onClick={handleDrawerToggle}
             sx={{
               '&.Mui-selected': {
                 backgroundColor: 'primary.light',
@@ -141,12 +171,9 @@ const Layout = ({ children }) => {
                   color: 'primary.main',
                 },
               },
-              '&:hover': {
-                backgroundColor: 'action.hover',
-              },
             }}
           >
-            <ListItemIcon sx={{ minWidth: 40 }}>
+            <ListItemIcon>
               {item.icon}
             </ListItemIcon>
             <ListItemText primary={item.label} />
@@ -163,64 +190,20 @@ const Layout = ({ children }) => {
         flexDirection: 'column',
         minHeight: '100vh',
         backgroundColor: 'background.default',
-        width: '100%',
-        overflowX: 'hidden',
       }}
     >
       {!isAdminLoginPage && (
         <AppBar 
-          position="fixed"
-          elevation={1}
+          position="sticky" 
+          elevation={0}
           sx={{
             backgroundColor: 'background.paper',
             borderBottom: 1,
             borderColor: 'divider',
           }}
         >
-          <Container maxWidth="xl" sx={{ px: { xs: 1, sm: 2 } }}>
-            <Toolbar 
-              disableGutters 
-              sx={{ 
-                minHeight: { xs: '56px' },
-                justifyContent: 'space-between'
-              }}
-            >
-              {/* Mobile menu icon */}
-              <IconButton
-                size="medium"
-                edge="start"
-                aria-label="menu"
-                onClick={handleDrawerToggle}
-                sx={{
-                  color: 'primary.main',
-                  display: { xs: 'flex', md: 'none' },
-                  mr: 1,
-                  '&:hover': {
-                    backgroundColor: 'rgba(25, 118, 210, 0.04)',
-                  },
-                }}
-              >
-                <MenuIcon />
-              </IconButton>
-
-              {/* Logo for mobile */}
-              <Typography
-                variant="h6"
-                noWrap
-                component={RouterLink}
-                to={isAdmin ? '/admin' : '/'}
-                sx={{
-                  display: { xs: 'flex', md: 'none' },
-                  fontWeight: 700,
-                  color: 'primary.main',
-                  textDecoration: 'none',
-                  fontSize: { xs: '1.1rem', sm: '1.25rem' },
-                  flexGrow: 0,
-                }}
-              >
-                {isAdmin ? 'Admin Panel' : 'PharmaLink'}
-              </Typography>
-
+          <Container maxWidth="xl">
+            <Toolbar disableGutters>
               {/* Logo for desktop */}
               <Typography
                 variant="h6"
@@ -230,6 +213,38 @@ const Layout = ({ children }) => {
                 sx={{
                   mr: 2,
                   display: { xs: 'none', md: 'flex' },
+                  fontWeight: 700,
+                  color: 'primary.main',
+                  textDecoration: 'none',
+                }}
+              >
+                {isAdmin ? 'Admin Panel' : 'PharmaLink'}
+              </Typography>
+
+              {/* Mobile menu icon */}
+              <Box sx={{ flexGrow: 1, display: { xs: 'flex', md: 'none' } }}>
+                <IconButton
+                  size="large"
+                  aria-label="account of current user"
+                  aria-controls="menu-appbar"
+                  aria-haspopup="true"
+                  onClick={handleDrawerToggle}
+                  color="inherit"
+                >
+                  <MenuIcon />
+                </IconButton>
+              </Box>
+
+              {/* Logo for mobile */}
+              <Typography
+                variant="h6"
+                noWrap
+                component={RouterLink}
+                to={isAdmin ? '/admin' : '/'}
+                sx={{
+                  mr: 2,
+                  display: { xs: 'flex', md: 'none' },
+                  flexGrow: 1,
                   fontWeight: 700,
                   color: 'primary.main',
                   textDecoration: 'none',
@@ -261,14 +276,12 @@ const Layout = ({ children }) => {
               </Box>
 
               {/* User menu */}
-              <Box sx={{ ml: { xs: 1, md: 2 } }}>
+              <Box sx={{ flexGrow: 0 }}>
                 {isAuthenticated ? (
                   <>
                     <Tooltip title="Open settings">
                       <IconButton onClick={handleOpenUserMenu} sx={{ p: 0 }}>
-                        <Avatar sx={{ bgcolor: 'primary.main' }}>
-                          {user?.name?.[0]?.toUpperCase() || 'U'}
-                        </Avatar>
+                        <Avatar>{user?.name?.[0] || 'U'}</Avatar>
                       </IconButton>
                     </Tooltip>
                     <Menu
@@ -287,21 +300,28 @@ const Layout = ({ children }) => {
                       open={Boolean(anchorElUser)}
                       onClose={handleCloseUserMenu}
                     >
-                      <MenuItem onClick={handleLogout}>
+                      <MenuItem onClick={handleLogoutClick}>
                         <Typography textAlign="center">Logout</Typography>
                       </MenuItem>
                     </Menu>
                   </>
                 ) : (
-                  <Button
-                    component={RouterLink}
-                    to="/login"
-                    color="primary"
-                    variant="contained"
-                    size="medium"
-                  >
-                    Login
-                  </Button>
+                  location.pathname !== '/login' && (
+                    <Button
+                      component={RouterLink}
+                      to="/login"
+                      variant="contained"
+                      color="primary"
+                      sx={{
+                        backgroundColor: isActivePath('/login') ? 'primary.dark' : 'primary.main',
+                        '&:hover': {
+                          backgroundColor: 'primary.dark',
+                        },
+                      }}
+                    >
+                      Login
+                    </Button>
+                  )
                 )}
               </Box>
             </Toolbar>
@@ -309,38 +329,36 @@ const Layout = ({ children }) => {
         </AppBar>
       )}
 
-      <Drawer
-        variant="temporary"
-        anchor="left"
-        open={mobileOpen}
-        onClose={handleDrawerToggle}
-        ModalProps={{
-          keepMounted: true,
-        }}
-        sx={{
-          display: { xs: 'block', md: 'none' },
-          '& .MuiDrawer-paper': { 
-            boxSizing: 'border-box', 
-            width: 250,
-            backgroundColor: 'background.paper',
-            mt: '56px', // Match the AppBar height
-          },
-        }}
-      >
-        {drawer}
-      </Drawer>
+      <Box component="nav">
+        <Drawer
+          variant="temporary"
+          open={mobileOpen}
+          onClose={handleDrawerToggle}
+          ModalProps={{
+            keepMounted: true,
+          }}
+          sx={{
+            display: { xs: 'block', md: 'none' },
+            '& .MuiDrawer-paper': { 
+              boxSizing: 'border-box', 
+              width: 240,
+              backgroundColor: 'background.paper',
+            },
+          }}
+        >
+          {drawer}
+        </Drawer>
+      </Box>
 
       <Box
         component="main"
         sx={{
           flexGrow: 1,
           width: '100%',
-          mt: '56px', // Match the AppBar height
+          backgroundColor: 'background.default',
         }}
       >
-        <div className="mobile-container">
-          {children}
-        </div>
+        {children}
       </Box>
 
       {!isAdmin && (
@@ -366,6 +384,53 @@ const Layout = ({ children }) => {
           </Container>
         </Box>
       )}
+
+            {/* Logout Confirmation Dialog */}
+      <Dialog
+        open={logoutDialogOpen}
+        onClose={handleLogoutCancel}
+        aria-labelledby="logout-dialog-title"
+        aria-describedby="logout-dialog-description"
+      >
+        <DialogTitle id="logout-dialog-title">
+          Confirm Logout
+        </DialogTitle>
+        <DialogContent>
+          <DialogContentText id="logout-dialog-description">
+            Are you sure you want to logout? You will need to login again to access your account.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleLogoutCancel} color="primary">
+            Cancel
+          </Button>
+          <Button onClick={handleLogoutConfirm} color="error" variant="contained">
+            Logout
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Logout Success Dialog */}
+      <Dialog
+        open={logoutSuccessDialogOpen}
+        onClose={handleLogoutSuccessClose}
+        aria-labelledby="logout-success-dialog-title"
+        aria-describedby="logout-success-dialog-description"
+      >
+        <DialogTitle id="logout-success-dialog-title" sx={{ textAlign: 'center' }}>
+          ✅ Logged Out Successfully
+        </DialogTitle>
+        <DialogContent>
+          <DialogContentText id="logout-success-dialog-description" sx={{ textAlign: 'center' }}>
+            You have been successfully logged out. The page will refresh to show the public view.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions sx={{ justifyContent: 'center' }}>
+          <Button onClick={handleLogoutSuccessClose} color="primary" variant="contained">
+            Continue
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };
