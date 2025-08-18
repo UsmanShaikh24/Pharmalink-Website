@@ -2,7 +2,7 @@ import axios from 'axios';
 
 // Create axios instance with custom config
 const instance = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5000',
+  baseURL: 'http://localhost:5000',
   timeout: 10000,
   headers: {
     'Content-Type': 'application/json'
@@ -28,8 +28,15 @@ instance.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      localStorage.removeItem('token');
-      window.location.href = '/login';
+      // Don't redirect for authentication endpoints or if we're already on login pages
+      const currentPath = window.location.pathname;
+      const isAuthEndpoint = error.config?.url?.includes('/auth/');
+      const isOnLoginPage = currentPath === '/login' || currentPath === '/admin/login';
+      
+      if (!isAuthEndpoint && !isOnLoginPage) {
+        localStorage.removeItem('token');
+        window.location.href = '/login';
+      }
     }
     return Promise.reject(error);
   }
