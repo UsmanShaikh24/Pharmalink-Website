@@ -120,8 +120,8 @@ const Layout = ({ children }) => {
   const navItems = isAdmin ? adminNavItems : userNavItems;
 
   const drawer = (
-    <Box onClick={handleDrawerToggle} sx={{ textAlign: 'center' }}>
-      <Typography variant="h6" sx={{ my: 2 }}>
+    <Box sx={{ textAlign: 'center', width: 250 }}>
+      <Typography variant="h6" sx={{ my: 2, px: 2 }}>
         {isAdmin ? 'Admin Panel' : 'PharmaLink'}
       </Typography>
       <Divider />
@@ -132,6 +132,7 @@ const Layout = ({ children }) => {
             component={RouterLink} 
             to={item.path}
             selected={isActivePath(item.path)}
+            onClick={handleDrawerToggle}
             sx={{
               '&.Mui-selected': {
                 backgroundColor: 'primary.light',
@@ -140,9 +141,12 @@ const Layout = ({ children }) => {
                   color: 'primary.main',
                 },
               },
+              '&:hover': {
+                backgroundColor: 'action.hover',
+              },
             }}
           >
-            <ListItemIcon>
+            <ListItemIcon sx={{ minWidth: 40 }}>
               {item.icon}
             </ListItemIcon>
             <ListItemText primary={item.label} />
@@ -159,20 +163,64 @@ const Layout = ({ children }) => {
         flexDirection: 'column',
         minHeight: '100vh',
         backgroundColor: 'background.default',
+        width: '100%',
+        overflowX: 'hidden',
       }}
     >
       {!isAdminLoginPage && (
         <AppBar 
-          position="sticky" 
-          elevation={0}
+          position="fixed"
+          elevation={1}
           sx={{
             backgroundColor: 'background.paper',
             borderBottom: 1,
             borderColor: 'divider',
           }}
         >
-          <Container maxWidth="xl">
-            <Toolbar disableGutters>
+          <Container maxWidth="xl" sx={{ px: { xs: 1, sm: 2 } }}>
+            <Toolbar 
+              disableGutters 
+              sx={{ 
+                minHeight: { xs: '56px' },
+                justifyContent: 'space-between'
+              }}
+            >
+              {/* Mobile menu icon */}
+              <IconButton
+                size="medium"
+                edge="start"
+                aria-label="menu"
+                onClick={handleDrawerToggle}
+                sx={{
+                  color: 'primary.main',
+                  display: { xs: 'flex', md: 'none' },
+                  mr: 1,
+                  '&:hover': {
+                    backgroundColor: 'rgba(25, 118, 210, 0.04)',
+                  },
+                }}
+              >
+                <MenuIcon />
+              </IconButton>
+
+              {/* Logo for mobile */}
+              <Typography
+                variant="h6"
+                noWrap
+                component={RouterLink}
+                to={isAdmin ? '/admin' : '/'}
+                sx={{
+                  display: { xs: 'flex', md: 'none' },
+                  fontWeight: 700,
+                  color: 'primary.main',
+                  textDecoration: 'none',
+                  fontSize: { xs: '1.1rem', sm: '1.25rem' },
+                  flexGrow: 0,
+                }}
+              >
+                {isAdmin ? 'Admin Panel' : 'PharmaLink'}
+              </Typography>
+
               {/* Logo for desktop */}
               <Typography
                 variant="h6"
@@ -182,38 +230,6 @@ const Layout = ({ children }) => {
                 sx={{
                   mr: 2,
                   display: { xs: 'none', md: 'flex' },
-                  fontWeight: 700,
-                  color: 'primary.main',
-                  textDecoration: 'none',
-                }}
-              >
-                {isAdmin ? 'Admin Panel' : 'PharmaLink'}
-              </Typography>
-
-              {/* Mobile menu icon */}
-              <Box sx={{ flexGrow: 1, display: { xs: 'flex', md: 'none' } }}>
-                <IconButton
-                  size="large"
-                  aria-label="account of current user"
-                  aria-controls="menu-appbar"
-                  aria-haspopup="true"
-                  onClick={handleDrawerToggle}
-                  color="inherit"
-                >
-                  <MenuIcon />
-                </IconButton>
-              </Box>
-
-              {/* Logo for mobile */}
-              <Typography
-                variant="h6"
-                noWrap
-                component={RouterLink}
-                to={isAdmin ? '/admin' : '/'}
-                sx={{
-                  mr: 2,
-                  display: { xs: 'flex', md: 'none' },
-                  flexGrow: 1,
                   fontWeight: 700,
                   color: 'primary.main',
                   textDecoration: 'none',
@@ -245,12 +261,14 @@ const Layout = ({ children }) => {
               </Box>
 
               {/* User menu */}
-              <Box sx={{ flexGrow: 0 }}>
+              <Box sx={{ ml: { xs: 1, md: 2 } }}>
                 {isAuthenticated ? (
                   <>
                     <Tooltip title="Open settings">
                       <IconButton onClick={handleOpenUserMenu} sx={{ p: 0 }}>
-                        <Avatar>{user?.name?.[0] || 'U'}</Avatar>
+                        <Avatar sx={{ bgcolor: 'primary.main' }}>
+                          {user?.name?.[0]?.toUpperCase() || 'U'}
+                        </Avatar>
                       </IconButton>
                     </Tooltip>
                     <Menu
@@ -275,22 +293,15 @@ const Layout = ({ children }) => {
                     </Menu>
                   </>
                 ) : (
-                  location.pathname !== '/login' && (
-                    <Button
-                      component={RouterLink}
-                      to="/login"
-                      variant="contained"
-                      color="primary"
-                      sx={{
-                        backgroundColor: isActivePath('/login') ? 'primary.dark' : 'primary.main',
-                        '&:hover': {
-                          backgroundColor: 'primary.dark',
-                        },
-                      }}
-                    >
-                      Login
-                    </Button>
-                  )
+                  <Button
+                    component={RouterLink}
+                    to="/login"
+                    color="primary"
+                    variant="contained"
+                    size="medium"
+                  >
+                    Login
+                  </Button>
                 )}
               </Box>
             </Toolbar>
@@ -298,36 +309,38 @@ const Layout = ({ children }) => {
         </AppBar>
       )}
 
-      <Box component="nav">
-        <Drawer
-          variant="temporary"
-          open={mobileOpen}
-          onClose={handleDrawerToggle}
-          ModalProps={{
-            keepMounted: true,
-          }}
-          sx={{
-            display: { xs: 'block', md: 'none' },
-            '& .MuiDrawer-paper': { 
-              boxSizing: 'border-box', 
-              width: 240,
-              backgroundColor: 'background.paper',
-            },
-          }}
-        >
-          {drawer}
-        </Drawer>
-      </Box>
+      <Drawer
+        variant="temporary"
+        anchor="left"
+        open={mobileOpen}
+        onClose={handleDrawerToggle}
+        ModalProps={{
+          keepMounted: true,
+        }}
+        sx={{
+          display: { xs: 'block', md: 'none' },
+          '& .MuiDrawer-paper': { 
+            boxSizing: 'border-box', 
+            width: 250,
+            backgroundColor: 'background.paper',
+            mt: '56px', // Match the AppBar height
+          },
+        }}
+      >
+        {drawer}
+      </Drawer>
 
       <Box
         component="main"
         sx={{
           flexGrow: 1,
           width: '100%',
-          backgroundColor: 'background.default',
+          mt: '56px', // Match the AppBar height
         }}
       >
-        {children}
+        <div className="mobile-container">
+          {children}
+        </div>
       </Box>
 
       {!isAdmin && (
