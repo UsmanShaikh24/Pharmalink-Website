@@ -37,7 +37,7 @@ import {
   LocationOn as LocationIcon,
   Store as StoreIcon
 } from '@mui/icons-material';
-import axiosInstance from '../utils/axios';
+import axios from 'axios';
 import debounce from 'lodash/debounce';
 
 // Common symptoms and conditions for autocomplete
@@ -77,21 +77,31 @@ const RecommendationSystem = () => {
     setLoadingMedicines(true);
     try {
       const token = localStorage.getItem('token');
-      if (!token) {
-        setError('Please log in to search medicines');
-        return;
+      const baseURL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+      
+      let response;
+      if (token) {
+        // Authenticated users use the protected endpoint
+        response = await axios.get(`${baseURL}/api/medicines/suggestions`, {
+          params: { search: searchText },
+          headers: { Authorization: `Bearer ${token}` }
+        });
+      } else {
+        // Guest users use the public endpoint
+        response = await axios.get(`${baseURL}/api/medicines/browse`, {
+          params: { search: searchText }
+        });
       }
 
-      const response = await axiosInstance.get('/api/medicines/suggestions', {
-        params: {
-          search: searchText
-        },
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
-      });
-
-      const suggestions = response.data?.suggestions || [];
+      let suggestions = [];
+      if (token) {
+        // Authenticated users get suggestions
+        suggestions = response.data?.suggestions || [];
+      } else {
+        // Guest users get medicines from browse endpoint
+        suggestions = response.data?.medicines || [];
+      }
+      
       if (!Array.isArray(suggestions)) {
         console.error('Invalid suggestions format:', suggestions);
         setError('Invalid response format from server');
@@ -130,40 +140,46 @@ const RecommendationSystem = () => {
     const fetchInitialMedicines = async () => {
       try {
         const token = localStorage.getItem('token');
-        if (!token) {
-          setError('Please log in to view medicines');
-          return;
+        const baseURL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+        
+        let response;
+        if (token) {
+          // Authenticated users use suggestions endpoint
+          response = await axios.get(`${baseURL}/api/medicines/suggestions`, {
+            params: { search: '' },
+            headers: { Authorization: `Bearer ${token}` }
+          });
+        } else {
+          // Guest users use browse endpoint
+          response = await axios.get(`${baseURL}/api/medicines/browse`, {
+            params: { search: '', limit: 20 }
+          });
         }
 
-        const response = await axiosInstance.get('/api/medicines/suggestions', {
-          params: {
-            search: ''
-          },
-          headers: {
-            Authorization: `Bearer ${token}`
-          }
-        });
-
-        const suggestions = response.data?.suggestions || [];
+        let suggestions = [];
+        if (token) {
+          // Authenticated users get suggestions
+          suggestions = response.data?.suggestions || [];
+        } else {
+          // Guest users get medicines from browse endpoint
+          suggestions = response.data?.medicines || [];
+        }
+        
         if (!Array.isArray(suggestions)) {
           throw new Error('Invalid medicines data received');
         }
 
         const options = suggestions.map(med => ({
           id: Math.random().toString(36).substr(2, 9),
-          label: med,
-          value: med
+          label: typeof med === 'string' ? med : med.name,
+          value: typeof med === 'string' ? med : med.name
         }));
 
         setMedicineOptions(options);
         setError(null);
       } catch (err) {
         console.error('Error fetching medicines:', err);
-        if (err.response?.status === 401) {
-          setError('Please log in to view medicines');
-        } else {
-          setError('Failed to load medicine suggestions. Please try again later.');
-        }
+        setError('Failed to load medicine suggestions. Please try again later.');
         setMedicineOptions([]);
       } finally {
         setLoadingMedicines(false);
@@ -180,19 +196,23 @@ const RecommendationSystem = () => {
 
     try {
       const token = localStorage.getItem('token');
-      if (!token) {
-        throw new Error('Please log in to use the recommendation system');
+      const baseURL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+      
+      let config = {};
+      let endpointPrefix = '';
+      
+      if (token) {
+        // Authenticated users use protected endpoints
+        config.headers = { 'Authorization': `Bearer ${token}` };
+        endpointPrefix = '';
+      } else {
+        // Guest users use public endpoints
+        endpointPrefix = '/public';
       }
 
-      const config = {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      };
-
       // Get medicine recommendations
-      const medicineResponse = await axiosInstance.post(
-        '/api/recommendations/medicines',
+      const medicineResponse = await axios.post(
+        `${baseURL}/api/recommendations${endpointPrefix}/medicines`,
         {
           ...formData,
           current_medications: formData.current_medications.map(med => 
@@ -210,8 +230,8 @@ const RecommendationSystem = () => {
       setRecommendations(recommendationsData);
 
       // Get health tips
-      const tipsResponse = await axiosInstance.post(
-        '/api/recommendations/health-tips',
+      const tipsResponse = await axios.post(
+        `${baseURL}/api/recommendations${endpointPrefix}/health-tips`,
         {
           conditions: formData.conditions,
           age_group: formData.age_group
@@ -227,9 +247,7 @@ const RecommendationSystem = () => {
       setHealthTips(tipsData);
     } catch (err) {
       console.error('Error in recommendation system:', err);
-      const errorMessage = err.response?.status === 401 
-        ? 'Please log in to use the recommendation system'
-        : err.response?.data?.message || err.message || 'Error fetching recommendations';
+      const errorMessage = err.response?.data?.message || err.message || 'Error fetching recommendations';
       setError(errorMessage);
     } finally {
       setLoading(false);
