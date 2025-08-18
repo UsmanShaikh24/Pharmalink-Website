@@ -67,7 +67,6 @@ With our AI-powered recommendation system, users can receive tailored medicine s
 - **Axios**: HTTP client for API requests (v1.6.7)
 - **React Router**: Client-side routing (v6.22.0)
 - **Vite**: Build tool and development server (v5.1.0)
-- **Google Maps API**: For location-based services
 
 ### Backend
 - **Node.js**: JavaScript runtime
@@ -101,7 +100,6 @@ With our AI-powered recommendation system, users can receive tailored medicine s
     "@mui/icons-material": "^5.15.10",
     "@mui/material": "^5.15.10",
     "@mui/x-data-grid": "^8.0.0",
-    "@react-google-maps/api": "^2.20.6",
     "@tanstack/react-query": "^5.17.19",
     "axios": "^1.6.7",
     "date-fns": "^4.1.0",
@@ -282,7 +280,6 @@ pharmalink/
    Required environment variables:
    ```
    VITE_API_URL=http://localhost:5000
-   VITE_GOOGLE_MAPS_API_KEY=your_google_maps_api_key
    ```
 
 3. Start the frontend development server
