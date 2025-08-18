@@ -1,902 +1,839 @@
-import { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
-  Box,
   Container,
+  Paper,
   Typography,
+  Grid,
+  TextField,
   Button,
+  Box,
+  Divider,
+  Alert,
+  CircularProgress,
   Dialog,
   DialogTitle,
   DialogContent,
   DialogActions,
-  TextField,
-  Grid,
-  Paper,
   IconButton,
-  InputAdornment,
-  Autocomplete,
-  CircularProgress,
-  Alert,
-  Snackbar
+  Card,
+  CardContent,
+  CardActions,
+  Fab,
+  FormControlLabel,
+  Checkbox,
+  Select,
+  MenuItem,
+  InputAdornment
 } from '@mui/material';
 import {
+  Person,
+  Email,
+  Phone,
+  LocationOn,
+  Lock,
   Add as AddIcon,
   Edit as EditIcon,
   Delete as DeleteIcon,
-  LocationOn,
-  Refresh as RefreshIcon
+  Star as StarIcon,
+  StarBorder as StarBorderIcon
 } from '@mui/icons-material';
-import axios from 'axios';
-import { loadGoogleMaps } from '../../utils/googleMaps';
+import { useAuth } from '../contexts/AuthContext';
+import axiosInstance from '../utils/axios';
+import { toast } from 'react-hot-toast';
 
-const PharmacyManagement = () => {
-  const [pharmacies, setPharmacies] = useState([]);
-  const [open, setOpen] = useState(false);
-  const [selectedPharmacy, setSelectedPharmacy] = useState(null);
+const Profile = () => {
+  const { user, updateUser } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [scriptLoaded, setScriptLoaded] = useState(false);
-  const [scriptError, setScriptError] = useState(null);
-  const [placesService, setPlacesService] = useState(null);
-  const [addressPredictions, setAddressPredictions] = useState([]);
-  const [addressLoading, setAddressLoading] = useState(false);
-  const [addressInput, setAddressInput] = useState('');
-  const [serverStatus, setServerStatus] = useState('checking');
-  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'info' });
+  const [editMode, setEditMode] = useState(false);
+  const [passwordDialog, setPasswordDialog] = useState(false);
+  const [addressDialog, setAddressDialog] = useState(false);
+  const [editingAddress, setEditingAddress] = useState(null);
 
+  // Form states
   const [formData, setFormData] = useState({
     name: '',
     email: '',
-    password: '',
-    licenseNumber: '',
-    contactNumber: '',
-    address: {
-      street: '',
-      city: '',
-      state: '',
-      pinCode: '',
-      coordinates: {
-        latitude: null,
-        longitude: null
-      }
-    },
-    operatingHours: {
-      open: '09:00',
-      close: '21:00'
-    },
-    deliveryRadius: 5
+    phoneNumber: '',
   });
 
-  // Add form validation state
-  const [touched, setTouched] = useState({
-    name: false,
-    licenseNumber: false,
-    email: false,
-    contactNumber: false,
-    address: false,
-    pinCode: false
+  const [addressFormData, setAddressFormData] = useState({
+    fullName: '',
+    phoneNumber: '',
+    street: '',
+    apartment: '',
+    landmark: '',
+    city: '',
+    state: '',
+    zipCode: '',
+    type: 'home',
+    isDefault: false
   });
 
-  // Handle field blur for validation
-  const handleBlur = (field) => {
-    setTouched(prev => ({ ...prev, [field]: true }));
-  };
+  // Password change states
+  const [passwordData, setPasswordData] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: ''
+  });
 
-  // Validation helper
-  const getFieldError = (field) => {
-    if (!touched[field]) return '';
-    
-    switch (field) {
-      case 'name':
-        return !formData.name ? 'Pharmacy name is required' : '';
-      case 'licenseNumber':
-        return !formData.licenseNumber ? 'License number is required' : '';
-      case 'email':
-        return !formData.email 
-          ? 'Email is required' 
-          : !/\S+@\S+\.\S+/.test(formData.email)
-          ? 'Invalid email format'
-          : '';
-      case 'contactNumber':
-        return !formData.contactNumber 
-          ? 'Contact number is required' 
-          : !/^\d{10}$/.test(formData.contactNumber)
-          ? 'Must be a 10-digit number'
-          : '';
-      case 'pinCode':
-        return !formData.address.pinCode 
-          ? 'PIN code is required' 
-          : !/^\d{6}$/.test(formData.address.pinCode)
-          ? 'Must be a 6-digit PIN code'
-          : '';
-      default:
-        return '';
-    }
-  };
+  const [fieldErrors, setFieldErrors] = useState({
+    fullName: false,
+    phoneNumber: false,
+    street: false,
+    city: false,
+    state: false,
+    zipCode: false
+  });
 
   useEffect(() => {
-    let cleanup = () => {};
+    if (user) {
+      setFormData({
+        name: user.name || '',
+        email: user.email || '',
+        phoneNumber: user.phoneNumber || '',
+      });
+    }
+  }, [user]);
 
-    const initializePlacesServices = () => {
-      if (!window.google?.maps?.places) {
-        console.error('Google Maps Places not available in initialization');
-        setScriptError('Places service not available. Please refresh the page.');
-        return;
-      }
+  useEffect(() => {
+    if (addressDialog) {
+      if (editingAddress) {
+        setAddressFormData({
+          fullName: editingAddress.fullName || '',
+          phoneNumber: editingAddress.phoneNumber || '',
+          street: editingAddress.street || '',
+          apartment: editingAddress.apartment || '',
+          landmark: editingAddress.landmark || '',
+          city: editingAddress.city || '',
+          state: editingAddress.state || '',
+          zipCode: editingAddress.zipCode || '',
+          type: editingAddress.type || 'home',
+          isDefault: editingAddress.isDefault || false,
 
-      try {
-        const mapContainer = document.createElement('div');
-        const autocompleteService = new window.google.maps.places.AutocompleteService();
-        const placesService = new window.google.maps.places.PlacesService(mapContainer);
-
-        setPlacesService({
-          autocomplete: autocompleteService,
-          places: placesService
         });
 
-        cleanup = () => {
-          // Cleanup logic if needed
-        };
-      } catch (error) {
-        console.error('Error initializing Places services:', error);
-        setScriptError('Failed to initialize Places services. Please refresh the page.');
+      } else {
+        setAddressFormData({
+          fullName: '',
+          phoneNumber: '',
+          street: '',
+          apartment: '',
+          landmark: '',
+          city: '',
+          state: '',
+          zipCode: '',
+          type: 'home',
+          isDefault: false,
+
+        });
+
       }
-    };
-
-    const loadMapsLibrary = async () => {
-      try {
-        setScriptLoaded(false);
-        await loadGoogleMaps();
-        setScriptLoaded(true);
-        initializePlacesServices();
-      } catch (error) {
-        console.error('Error loading Google Maps:', error);
-        setScriptError('Failed to load Google Maps. Please check your internet connection.');
-      }
-    };
-
-    loadMapsLibrary();
-
-    return () => {
-      cleanup();
-      setScriptLoaded(false);
-      setPlacesService(null);
-    };
-  }, []);
-
-  // Check server connection
-  useEffect(() => {
-    checkServerConnection();
-  }, []);
-
-  const checkServerConnection = async () => {
-    try {
-      setServerStatus('checking');
-      // Use the pharmacies endpoint to check server status
-      await axios.get(`${import.meta.env.VITE_API_URL}/api/pharmacies`, {
-        timeout: 5000,
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        }
-      });
-      setServerStatus('connected');
-      // If connection is successful, load pharmacies
-      loadPharmacies();
-    } catch (err) {
-      console.error('Server connection error:', err);
-      setServerStatus('disconnected');
-      showSnackbar('Server connection failed. Please check if the server is running.', 'error');
     }
-  };
+  }, [addressDialog, editingAddress]);
 
-  const showSnackbar = (message, severity = 'info') => {
-    setSnackbar({ open: true, message, severity });
-  };
 
-  const handleCloseSnackbar = () => {
-    setSnackbar(prev => ({ ...prev, open: false }));
-  };
 
-  const getAuthHeaders = () => ({
-    'Content-Type': 'application/json',
-    'Accept': 'application/json',
-    'Authorization': `Bearer ${localStorage.getItem('token')}`
-  });
 
-  const loadPharmacies = async () => {
-    if (serverStatus === 'disconnected') {
-      showSnackbar('Cannot load pharmacies: Server is not connected', 'error');
-      return;
-    }
-
-    try {
-      setLoading(true);
-      setError(null);
-      const response = await axios.get(`${import.meta.env.VITE_API_URL}/api/pharmacies`, {
-        withCredentials: true,
-        headers: getAuthHeaders()
-      });
-      setPharmacies(response.data);
-    } catch (err) {
-      handleApiError(err, 'Failed to fetch pharmacies');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleApiError = (err, defaultMessage) => {
-    console.error('API Error:', err);
-    let errorMessage = `${defaultMessage}. `;
-    
-    if (err.response) {
-      console.error('Response data:', err.response.data);
-      console.error('Response status:', err.response.status);
-      
-      if (err.response.status === 401) {
-        errorMessage = 'Your session has expired. Please log in again.';
-        // Redirect to login page or trigger re-authentication
-        window.location.href = '/login';
-      } else if (err.response.status === 403) {
-        errorMessage = 'You do not have permission to perform this action.';
-      } else if (err.response.status === 404) {
-        errorMessage = 'The requested resource was not found.';
-      } else if (err.response.data?.error) {
-        errorMessage = err.response.data.error;
-      } else if (err.response.data?.errors) {
-        // Handle validation errors
-        const validationErrors = err.response.data.errors
-          .map(error => error.msg)
-          .join(', ');
-        errorMessage = `Validation failed: ${validationErrors}`;
-      }
-    } else if (err.request) {
-      errorMessage = 'No response from server. Please check your internet connection.';
-    } else {
-      errorMessage = 'An unexpected error occurred. Please try again.';
-    }
-    
-    setError(errorMessage);
-    showSnackbar(errorMessage, 'error');
-  };
-
-  const handleAddressSelect = (prediction) => {
-    if (!prediction || !placesService) return;
-
-    setAddressLoading(true);
-    placesService.places.getDetails(
-      {
-        placeId: prediction.place_id,
-        fields: ['address_components', 'formatted_address', 'geometry'],
-      },
-      (place, status) => {
-        setAddressLoading(false);
-        if (status === 'OK' && place) {
-          const addressComponents = place.address_components;
-          
-          // Extract address components for Indian format
-          const streetNumber = addressComponents.find(c => c.types.includes('street_number'))?.long_name || '';
-          const route = addressComponents.find(c => c.types.includes('route'))?.long_name || '';
-          const sublocality = addressComponents.find(c => c.types.includes('sublocality_level_1'))?.long_name || '';
-          const locality = addressComponents.find(c => c.types.includes('locality'))?.long_name || '';
-          const city = addressComponents.find(c => 
-            c.types.includes('administrative_area_level_2') || 
-            c.types.includes('locality')
-          )?.long_name;
-          const state = addressComponents.find(c => c.types.includes('administrative_area_level_1'))?.long_name;
-          const pinCode = addressComponents.find(c => c.types.includes('postal_code'))?.long_name;
-
-          // Combine street address components
-          const street = [streetNumber, route, sublocality, locality]
-            .filter(Boolean)
-            .join(', ');
-
-          const finalStreet = street || place.formatted_address;
-
-          setAddressInput(finalStreet);
-          setFormData(prev => ({
-            ...prev,
-            address: {
-              street: finalStreet,
-              city: city || '',
-              state: state || '',
-              pinCode: pinCode || '',
-              coordinates: {
-                latitude: place.geometry?.location.lat() || null,
-                longitude: place.geometry?.location.lng() || null
-              }
-            }
-          }));
-          setAddressPredictions([]);
-        }
-      }
-    );
-  };
-
-  const handleAddressSearch = (value) => {
-    setAddressInput(value);
-    
-    if (!value || !placesService) {
-      setAddressPredictions([]);
-      return;
-    }
-
-    placesService.autocomplete.getPlacePredictions(
-      {
-        input: value,
-        componentRestrictions: { country: 'IN' },
-        types: ['geocode', 'establishment'],
-        language: 'en',
-        region: 'IN',
-      },
-      (predictions, status) => {
-        if (status === 'OK' && predictions && predictions.length > 0) {
-          setAddressPredictions(predictions);
-        } else {
-          setAddressPredictions([]);
-        }
-      }
-    );
-  };
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    if (name.includes('.')) {
-      const [parent, child] = name.split('.');
-      setFormData(prev => ({
-        ...prev,
-        [parent]: {
-          ...prev[parent],
-          [child]: value
-        }
-      }));
-    } else {
-      setFormData(prev => ({
-        ...prev,
-        [name]: value
-      }));
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const validateField = (name, value) => {
+    switch (name) {
+      case 'phoneNumber':
+        return value.length === 10;
+      case 'zipCode':
+        return value.length === 6;
+      case 'fullName':
+      case 'street':
+      case 'city':
+      case 'state':
+        return value.trim().length > 0;
+      default:
+        return true;
     }
+  };
+
+  const handleAddressInputChange = (e) => {
+    const { name, value } = e.target;
+    setAddressFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+
+    // Update field error state
+    setFieldErrors(prev => ({
+      ...prev,
+      [name]: !validateField(name, value)
+    }));
+  };
+
+  const handlePhoneNumberChange = (e) => {
+    const { value } = e.target;
+    // Only allow numbers and limit to 10 digits
+    const phoneNumber = value.replace(/\D/g, '').slice(0, 10);
+    setAddressFormData(prev => ({
+      ...prev,
+      phoneNumber
+    }));
+
+    // Update phone number error state
+    setFieldErrors(prev => ({
+      ...prev,
+      phoneNumber: phoneNumber.length !== 10
+    }));
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (serverStatus === 'disconnected') {
-      showSnackbar('Cannot save pharmacy: Server is not connected', 'error');
-      return;
-    }
-
     setLoading(true);
     setError(null);
 
-    // Validate required fields
-    const requiredFields = {
-      name: formData.name,
-      licenseNumber: formData.licenseNumber,
-      email: formData.email,
-      contactNumber: formData.contactNumber,
-      'street address': formData.address.street,
-      'PIN code': formData.address.pinCode
-    };
-
-    const missingFields = Object.entries(requiredFields)
-      .filter(([_, value]) => !value)
-      .map(([field]) => field);
-
-    if (missingFields.length > 0) {
-      const errorMessage = `Please fill in required fields: ${missingFields.join(', ')}`;
+    try {
+      const response = await axiosInstance.patch('/api/users/profile', formData);
+      updateUser(response.data);
+      setEditMode(false);
+      toast.success('Profile updated successfully');
+    } catch (err) {
+      const errorMessage = err.response?.data?.message || err.message || 'Failed to update profile';
       setError(errorMessage);
-      showSnackbar(errorMessage, 'error');
+      toast.error(errorMessage);
+    } finally {
       setLoading(false);
-      return;
     }
+  };
+
+  const handleAddressSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
 
     try {
-      const endpoint = selectedPharmacy
-        ? `${import.meta.env.VITE_API_URL}/api/pharmacies/${selectedPharmacy._id}`
-        : `${import.meta.env.VITE_API_URL}/api/pharmacies`;
+      // Validate required fields
+      const requiredFields = ['fullName', 'phoneNumber', 'street', 'city', 'state', 'zipCode'];
+      const missingFields = requiredFields.filter(field => !addressFormData[field]);
+      
+      if (missingFields.length > 0) {
+        throw new Error(`Please fill in all required fields: ${missingFields.join(', ')}`);
+      }
 
-      const method = selectedPharmacy ? 'put' : 'post';
-
-      const pharmacyData = {
-        ...formData,
-        role: 'pharmacy',
-        status: 'active'
+      let response;
+      const addressData = {
+        fullName: addressFormData.fullName,
+        phoneNumber: addressFormData.phoneNumber,
+        street: addressFormData.street,
+        apartment: addressFormData.apartment || '',
+        landmark: addressFormData.landmark || '',
+        city: addressFormData.city,
+        state: addressFormData.state,
+        zipCode: addressFormData.zipCode,
+        type: addressFormData.type || 'home',
+        isDefault: addressFormData.isDefault || false,
+        coordinates: addressFormData.coordinates || { latitude: null, longitude: null }
       };
 
-      const response = await axios({
-        method,
-        url: endpoint,
-        data: pharmacyData,
-        withCredentials: true,
-        headers: getAuthHeaders()
-      });
+      console.log('Submitting address data:', addressData);
 
+      if (editingAddress) {
+        console.log('Updating address:', editingAddress._id);
+        response = await axiosInstance.patch(
+          `/api/users/addresses/${editingAddress._id}`,
+          addressData
+        );
+      } else {
+        console.log('Creating new address');
+        response = await axiosInstance.post('/api/users/addresses', addressData);
+      }
+      
+      console.log('API Response:', response.data);
+      
       if (response.data) {
-        const message = selectedPharmacy 
-          ? 'Pharmacy updated successfully' 
-          : 'Pharmacy added successfully';
-        showSnackbar(message, 'success');
-        await loadPharmacies();
-        handleClose();
+        updateUser(response.data);
+        setAddressDialog(false);
+        setEditingAddress(null);
+        toast.success(`Address ${editingAddress ? 'updated' : 'added'} successfully`);
+      } else {
+        throw new Error('No response data received');
       }
     } catch (err) {
-      handleApiError(err, 'Failed to save pharmacy');
+      console.error('Error saving address:', err);
+      const errorMessage = err.response?.data?.error || err.response?.data?.message || err.message || 'Failed to save address';
+      setError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleEdit = (pharmacy) => {
-    setSelectedPharmacy(pharmacy);
-    setFormData({
-      ...pharmacy,
-      address: {
-        ...pharmacy.address,
-        pinCode: pharmacy.address.pinCode || ''
+  const handleDeleteAddress = async (addressId) => {
+    try {
+      console.log('Deleting address:', addressId); // Debug log
+      const response = await axiosInstance.delete(`/api/users/addresses/${addressId}`);
+      
+      console.log('Delete response:', response.data); // Debug log
+      
+      if (response.data.success) {
+        updateUser(response.data.user);
+        toast.success('Address deleted successfully');
+      } else {
+        throw new Error(response.data.message || 'Failed to delete address');
       }
-    });
-    setAddressInput(pharmacy.address.street);
-    setOpen(true);
+    } catch (err) {
+      console.error('Error deleting address:', err); // Debug log
+      const errorMessage = err.response?.data?.message || err.message || 'Failed to delete address';
+      toast.error(errorMessage);
+    }
   };
 
-  const handleDelete = async (id) => {
-    if (!id || !window.confirm('Are you sure you want to delete this pharmacy?')) {
-      return;
+  const handleSetDefaultAddress = async (addressId) => {
+    try {
+      console.log('Setting default address:', addressId); // Debug log
+      const response = await axiosInstance.patch(`/api/users/addresses/${addressId}/set-default`);
+      
+      console.log('Set default response:', response.data); // Debug log
+      
+      if (response.data.success) {
+        updateUser(response.data.user);
+        toast.success('Default address updated');
+      } else {
+        throw new Error(response.data.message || 'Failed to update default address');
+      }
+    } catch (err) {
+      console.error('Error setting default address:', err); // Debug log
+      const errorMessage = err.response?.data?.message || err.message || 'Failed to update default address';
+      toast.error(errorMessage);
     }
+  };
+
+  const handlePasswordChange = (e) => {
+    const { name, value } = e.target;
+    setPasswordData(prev => ({
+      ...prev,
+      [name]: value.trim()
+    }));
+  };
+
+  const handlePasswordSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
 
     try {
-      setLoading(true);
-      setError(null);
-      
-      await axios.delete(`${import.meta.env.VITE_API_URL}/api/pharmacies/${id}`, {
-        withCredentials: true,
-        headers: getAuthHeaders()
+      // Validate password fields
+      if (!passwordData.currentPassword || !passwordData.newPassword || !passwordData.confirmPassword) {
+        throw new Error('Please fill in all password fields');
+      }
+
+      if (passwordData.newPassword !== passwordData.confirmPassword) {
+        throw new Error('New passwords do not match');
+      }
+
+      // Password strength validation
+      const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
+      if (!passwordRegex.test(passwordData.newPassword)) {
+        throw new Error(
+          'Password must be at least 8 characters long and contain at least one uppercase letter, one lowercase letter, one number, and one special character'
+        );
+      }
+
+      await axiosInstance.patch('/api/users/change-password', {
+        currentPassword: passwordData.currentPassword,
+        newPassword: passwordData.newPassword
       });
-      
-      showSnackbar('Pharmacy deleted successfully', 'success');
-      await loadPharmacies();
+
+      setPasswordDialog(false);
+      setPasswordData({
+        currentPassword: '',
+        newPassword: '',
+        confirmPassword: ''
+      });
+      toast.success('Password changed successfully');
     } catch (err) {
-      handleApiError(err, 'Failed to delete pharmacy');
+      const errorMessage = err.response?.data?.message || err.message || 'Failed to change password';
+      setError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleClose = () => {
-    setOpen(false);
-    setSelectedPharmacy(null);
-    setAddressPredictions([]);
-    setError(null);
-    setFormData({
-      name: '',
-      email: '',
-      password: '',
-      licenseNumber: '',
-      contactNumber: '',
-      address: {
-        street: '',
-        city: '',
-        state: '',
-        pinCode: '',
-        coordinates: {
-          latitude: null,
-          longitude: null
-        }
-      },
-      operatingHours: {
-        open: '09:00',
-        close: '21:00'
-      },
-      deliveryRadius: 5
-    });
-    setAddressInput('');
-  };
-
-  if (scriptError) {
-    return (
-      <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
-        <Alert 
-          severity="error" 
-          action={
-            <Button color="inherit" size="small" onClick={() => window.location.reload()}>
-              Refresh Page
-            </Button>
-          }
-        >
-          {scriptError}
-        </Alert>
-      </Container>
-    );
-  }
-
   return (
-    <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
-      <Box display="flex" justifyContent="space-between" alignItems="center" mb={4}>
-        <Typography variant="h4" component="h1">
-          Manage Pharmacies
-        </Typography>
-        <Box display="flex" gap={2}>
+    <Container maxWidth="md" sx={{ py: 4 }}>
+      <Paper elevation={3} sx={{ p: 4 }}>
+        <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
+          <Typography variant="h4" gutterBottom>
+            Profile
+          </Typography>
           <Button
-            variant="outlined"
-            startIcon={<RefreshIcon />}
-            onClick={checkServerConnection}
-            color={serverStatus === 'connected' ? 'success' : 'error'}
-            disabled={serverStatus === 'checking'}
+            variant={editMode ? "outlined" : "contained"}
+            color={editMode ? "error" : "primary"}
+            onClick={() => setEditMode(!editMode)}
+            disabled={loading}
           >
-            {serverStatus === 'checking' ? (
-              <>
-                <CircularProgress size={20} sx={{ mr: 1 }} />
-                Checking Server...
-              </>
-            ) : serverStatus === 'connected' ? (
-              'Server Connected'
-            ) : (
-              'Reconnect Server'
-            )}
-          </Button>
-          <Button
-            variant="contained"
-            startIcon={<AddIcon />}
-            onClick={() => {
-              if (serverStatus === 'disconnected') {
-                showSnackbar('Cannot add pharmacy: Server is not connected', 'error');
-                return;
-              }
-              setSelectedPharmacy(null);
-              setFormData({
-                name: '',
-                email: '',
-                password: '',
-                licenseNumber: '',
-                contactNumber: '',
-                address: {
-                  street: '',
-                  city: '',
-                  state: '',
-                  pinCode: '',
-                  coordinates: {
-                    latitude: null,
-                    longitude: null
-                  }
-                },
-                operatingHours: {
-                  open: '09:00',
-                  close: '21:00'
-                },
-                deliveryRadius: 5
-              });
-              setAddressInput('');
-              setOpen(true);
-            }}
-            disabled={serverStatus !== 'connected'}
-          >
-            Add Pharmacy
+            {editMode ? 'Cancel' : 'Edit Profile'}
           </Button>
         </Box>
-      </Box>
 
-      {loading && !open ? (
-        <Box sx={{ display: 'flex', justifyContent: 'center', my: 4 }}>
-          <CircularProgress />
-        </Box>
-      ) : (
-        <Grid container spacing={3}>
-          {pharmacies.map((pharmacy) => (
-            <Grid key={pharmacy._id} item xs={12} md={6} lg={4}>
-              <Box
-                sx={{
-                  p: 2,
-                  border: '1px solid',
-                  borderColor: 'divider',
-                  borderRadius: 1,
+        {error && (
+          <Alert severity="error" sx={{ mb: 2 }}>
+            {error}
+          </Alert>
+        )}
+
+        <form onSubmit={handleSubmit}>
+          <Grid container spacing={3}>
+            <Grid item xs={12}>
+              <Typography variant="h6" gutterBottom>
+                Personal Information
+              </Typography>
+            </Grid>
+
+            <Grid item xs={12} md={6}>
+              <TextField
+                fullWidth
+                label="Name"
+                name="name"
+                value={formData.name}
+                onChange={handleInputChange}
+                disabled={!editMode || loading}
+                required
+                autoComplete="name"
+                InputProps={{
+                  startAdornment: <Person sx={{ mr: 1, color: 'text.secondary' }} />
                 }}
-              >
-                <Typography variant="h6" gutterBottom>
-                  {pharmacy.name}
-                </Typography>
-                <Typography variant="body2" color="text.secondary" paragraph>
-                  License: {pharmacy.licenseNumber}
-                </Typography>
-                <Typography variant="body2" paragraph>
-                  {pharmacy.address.street}
-                  <br />
-                  {pharmacy.address.city}, {pharmacy.address.state}
-                  <br />
-                  PIN: {pharmacy.address.pinCode}
-                </Typography>
-                <Box sx={{ mt: 2, display: 'flex', gap: 1 }}>
+              />
+            </Grid>
+
+            <Grid item xs={12} md={6}>
+              <TextField
+                fullWidth
+                label="Email"
+                name="email"
+                type="email"
+                value={formData.email}
+                onChange={handleInputChange}
+                disabled={!editMode || loading}
+                required
+                autoComplete="email"
+                InputProps={{
+                  startAdornment: <Email sx={{ mr: 1, color: 'text.secondary' }} />
+                }}
+              />
+            </Grid>
+
+            <Grid item xs={12} md={6}>
+              <TextField
+                fullWidth
+                label="Phone Number"
+                name="phoneNumber"
+                value={formData.phoneNumber}
+                onChange={handleInputChange}
+                disabled={!editMode || loading}
+                required
+                autoComplete="tel"
+                InputProps={{
+                  startAdornment: <Phone sx={{ mr: 1, color: 'text.secondary' }} />
+                }}
+              />
+            </Grid>
+
+            <Grid item xs={12}>
+              <Box display="flex" justifyContent="flex-end" mt={2}>
+                {editMode && (
+                  <Button
+                    type="submit"
+                    variant="contained"
+                    color="primary"
+                    disabled={loading}
+                  >
+                    {loading ? <CircularProgress size={24} /> : 'Save Changes'}
+                  </Button>
+                )}
+              </Box>
+            </Grid>
+          </Grid>
+        </form>
+
+        <Divider sx={{ my: 4 }} />
+
+        <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
+          <Typography variant="h6">
+            Delivery Addresses
+          </Typography>
+          <Fab
+            color="primary"
+            size="small"
+            onClick={() => {
+              setEditingAddress(null);
+              setAddressDialog(true);
+            }}
+          >
+            <AddIcon />
+          </Fab>
+        </Box>
+
+        <Grid container spacing={2}>
+          {user?.addresses?.map((address) => (
+            <Grid item xs={12} md={6} key={address._id}>
+              <Card>
+                <CardContent>
+                  <Box display="flex" justifyContent="space-between" alignItems="center">
+                    <Typography variant="subtitle1" gutterBottom>
+                      {address.fullName}
+                    </Typography>
+                    <IconButton
+                      size="small"
+                      color={address.isDefault ? "primary" : "default"}
+                      onClick={() => handleSetDefaultAddress(address._id)}
+                    >
+                      {address.isDefault ? <StarIcon /> : <StarBorderIcon />}
+                    </IconButton>
+                  </Box>
+                  <Typography variant="body2" color="text.secondary">
+                    {address.phoneNumber}
+                  </Typography>
+                  <Typography variant="body2">
+                    {[
+                      address.street,
+                      address.apartment,
+                      address.landmark,
+                      address.city,
+                      address.state,
+                      address.zipCode
+                    ].filter(Boolean).join(', ')}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary" sx={{ mt: 1 }}>
+                    {address.type.charAt(0).toUpperCase() + address.type.slice(1)} Address
+                  </Typography>
+                </CardContent>
+                <CardActions>
                   <Button
                     size="small"
-                    variant="outlined"
-                    onClick={() => handleEdit(pharmacy)}
+                    startIcon={<EditIcon />}
+                    onClick={() => {
+                      setEditingAddress(address);
+                      setAddressDialog(true);
+                    }}
                   >
                     Edit
                   </Button>
                   <Button
                     size="small"
-                    variant="outlined"
                     color="error"
-                    onClick={() => handleDelete(pharmacy._id)}
+                    startIcon={<DeleteIcon />}
+                    onClick={() => handleDeleteAddress(address._id)}
+                    disabled={address.isDefault}
                   >
                     Delete
                   </Button>
-                </Box>
-              </Box>
+                </CardActions>
+              </Card>
             </Grid>
           ))}
         </Grid>
-      )}
 
-      <Dialog open={open} onClose={handleClose} maxWidth="md" fullWidth>
+        <Box display="flex" justifyContent="space-between" mt={4}>
+          <Button
+            variant="outlined"
+            color="primary"
+            onClick={() => setPasswordDialog(true)}
+            startIcon={<Lock />}
+          >
+            Change Password
+          </Button>
+        </Box>
+      </Paper>
+
+      {/* Address Dialog */}
+      <Dialog
+        open={addressDialog}
+        onClose={() => {
+          setAddressDialog(false);
+          setEditingAddress(null);
+        }}
+        maxWidth="sm"
+        fullWidth
+      >
         <DialogTitle>
-          {selectedPharmacy ? 'Edit Pharmacy' : 'Add New Pharmacy'}
+          {editingAddress ? 'Edit Address' : 'Add New Address'}
         </DialogTitle>
         <DialogContent>
-          <Box component="form" noValidate sx={{ mt: 2 }}>
+          <Box 
+            component="form" 
+            onSubmit={handleAddressSubmit} 
+            sx={{ mt: 2 }}
+            autoComplete="on"
+          >
             <Grid container spacing={2}>
-              <Grid item xs={12} sm={6}>
+              <Grid item xs={12} md={6}>
                 <TextField
-                  required
                   fullWidth
-                  label="Pharmacy Name"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  onBlur={() => handleBlur('name')}
-                  error={touched.name && !!getFieldError('name')}
-                  helperText={touched.name && getFieldError('name')}
+                  label="Full Name"
+                  name="fullName"
+                  value={addressFormData.fullName}
+                  onChange={handleAddressInputChange}
+                  required
+                  placeholder="Enter full name"
+                  error={fieldErrors.fullName}
+                  helperText={fieldErrors.fullName ? "Full name is required" : ""}
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <Person sx={{ color: 'text.secondary' }} />
+                      </InputAdornment>
+                    ),
+                  }}
                 />
               </Grid>
-              <Grid item xs={12} sm={6}>
+              <Grid item xs={12} md={6}>
                 <TextField
-                  required
-                  fullWidth
-                  label="License Number"
-                  value={formData.licenseNumber}
-                  onChange={(e) => setFormData({ ...formData, licenseNumber: e.target.value })}
-                  onBlur={() => handleBlur('licenseNumber')}
-                  error={touched.licenseNumber && !!getFieldError('licenseNumber')}
-                  helperText={touched.licenseNumber && getFieldError('licenseNumber')}
-                />
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  required
-                  fullWidth
-                  type="email"
-                  label="Email"
-                  value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  onBlur={() => handleBlur('email')}
-                  error={touched.email && !!getFieldError('email')}
-                  helperText={touched.email && getFieldError('email')}
-                />
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  required
                   fullWidth
                   label="Contact Number"
-                  value={formData.contactNumber}
-                  onChange={(e) => setFormData({ ...formData, contactNumber: e.target.value })}
-                  onBlur={() => handleBlur('contactNumber')}
-                  error={touched.contactNumber && !!getFieldError('contactNumber')}
-                  helperText={touched.contactNumber && getFieldError('contactNumber')}
+                  name="phoneNumber"
+                  value={addressFormData.phoneNumber}
+                  onChange={handlePhoneNumberChange}
+                  required
+                  placeholder="Enter 10-digit mobile number"
+                  error={fieldErrors.phoneNumber}
+                  helperText={fieldErrors.phoneNumber ? "Phone number must be 10 digits" : ""}
+                  inputProps={{
+                    maxLength: 10,
+                    pattern: '[0-9]*'
+                  }}
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <Phone sx={{ color: 'text.secondary' }} />
+                      </InputAdornment>
+                    ),
+                  }}
                 />
               </Grid>
               <Grid item xs={12}>
-                <Autocomplete
-                  freeSolo
-                  options={addressPredictions}
-                  getOptionLabel={(option) => 
-                    typeof option === 'string' ? option : option.description
-                  }
-                  renderOption={(props, option) => {
-                    // Extract key and other props
-                    const { key, ...otherProps } = props;
-                    return (
-                      <li key={option.place_id} {...otherProps}>
-                        <Grid container alignItems="center">
-                          <Grid item>
-                            <LocationOn sx={{ color: 'text.secondary', mr: 2 }} />
-                          </Grid>
-                          <Grid item xs>
-                            <Typography variant="body1">
-                              {option.structured_formatting?.main_text || option.description}
-                            </Typography>
-                            <Typography variant="body2" color="text.secondary">
-                              {option.structured_formatting?.secondary_text}
-                            </Typography>
-                          </Grid>
-                        </Grid>
-                      </li>
-                    );
+                <TextField
+                  fullWidth
+                  label="Street Address"
+                  name="street"
+                  value={addressFormData.street}
+                  onChange={handleAddressInputChange}
+                  required
+                  placeholder="Enter your street address"
+                  error={fieldErrors.street}
+                  helperText={fieldErrors.street ? "Street address is required" : ""}
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <LocationOn sx={{ color: 'text.secondary' }} />
+                      </InputAdornment>
+                    ),
                   }}
-                  value={addressInput}
-                  onChange={(_, newValue) => {
-                    if (typeof newValue === 'string') {
-                      setAddressInput(newValue);
-                    } else if (newValue) {
-                      handleAddressSelect(newValue);
-                    }
-                  }}
-                  onInputChange={(_, newInputValue) => {
-                    setAddressInput(newInputValue);
-                    if (newInputValue) {
-                      handleAddressSearch(newInputValue);
-                    }
-                  }}
-                  renderInput={(params) => (
-                    <TextField
-                      {...params}
-                      required
-                      fullWidth
-                      label="Address"
-                      error={!formData.address.street}
-                      helperText={!formData.address.street ? 'Address is required' : ''}
-                      InputProps={{
-                        ...params.InputProps,
-                        endAdornment: (
-                          <>
-                            {addressLoading && (
-                              <CircularProgress color="inherit" size={20} />
-                            )}
-                            {params.InputProps.endAdornment}
-                          </>
-                        ),
-                      }}
-                    />
-                  )}
                 />
               </Grid>
-              <Grid item xs={12} sm={6}>
+              <Grid item xs={12}>
+                <TextField
+                  fullWidth
+                  label="Apartment/Suite/Floor"
+                  name="apartment"
+                  value={addressFormData.apartment}
+                  onChange={handleAddressInputChange}
+                  placeholder="Enter apartment, suite, or floor number"
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <LocationOn sx={{ color: 'text.secondary' }} />
+                      </InputAdornment>
+                    ),
+                  }}
+                />
+              </Grid>
+              <Grid item xs={12}>
+                <TextField
+                  fullWidth
+                  label="Landmark"
+                  name="landmark"
+                  value={addressFormData.landmark}
+                  onChange={handleAddressInputChange}
+                  placeholder="Enter a nearby landmark (optional)"
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <LocationOn sx={{ color: 'text.secondary' }} />
+                      </InputAdornment>
+                    ),
+                  }}
+                />
+              </Grid>
+              <Grid item xs={12} md={6}>
                 <TextField
                   fullWidth
                   label="City"
-                  value={formData.address.city}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      address: { ...formData.address, city: e.target.value },
-                    })
-                  }
-                  disabled
+                  name="city"
+                  value={addressFormData.city}
+                  onChange={handleAddressInputChange}
+                  required
+                  placeholder="Enter city"
+                  error={fieldErrors.city}
+                  helperText={fieldErrors.city ? "City is required" : ""}
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <LocationOn sx={{ color: 'text.secondary' }} />
+                      </InputAdornment>
+                    ),
+                  }}
                 />
               </Grid>
-              <Grid item xs={12} sm={6}>
+              <Grid item xs={12} md={6}>
                 <TextField
                   fullWidth
                   label="State"
-                  value={formData.address.state}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      address: { ...formData.address, state: e.target.value },
-                    })
-                  }
-                  disabled
+                  name="state"
+                  value={addressFormData.state}
+                  onChange={handleAddressInputChange}
+                  required
+                  placeholder="Enter state"
+                  error={fieldErrors.state}
+                  helperText={fieldErrors.state ? "State is required" : ""}
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <LocationOn sx={{ color: 'text.secondary' }} />
+                      </InputAdornment>
+                    ),
+                  }}
                 />
               </Grid>
-              <Grid item xs={12} sm={6}>
+              <Grid item xs={12} md={6}>
                 <TextField
                   fullWidth
-                  label="PIN Code"
-                  value={formData.address.pinCode}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      address: { ...formData.address, pinCode: e.target.value },
-                    })
-                  }
-                  onBlur={() => handleBlur('pinCode')}
-                  error={touched.pinCode && !!getFieldError('pinCode')}
-                  helperText={touched.pinCode && getFieldError('pinCode')}
+                  label="ZIP Code"
+                  name="zipCode"
+                  value={addressFormData.zipCode}
+                  onChange={handleAddressInputChange}
+                  required
+                  placeholder="Enter 6-digit PIN code"
+                  error={fieldErrors.zipCode}
+                  helperText={fieldErrors.zipCode ? "ZIP code must be 6 digits" : ""}
+                  inputProps={{
+                    maxLength: 6,
+                    pattern: '[0-9]*'
+                  }}
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <LocationOn sx={{ color: 'text.secondary' }} />
+                      </InputAdornment>
+                    ),
+                  }}
                 />
               </Grid>
-              <Grid item xs={12} sm={6}>
+              <Grid item xs={12} md={6}>
                 <TextField
+                  select
                   fullWidth
-                  type="number"
-                  label="Delivery Radius (km)"
-                  value={formData.deliveryRadius}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      deliveryRadius: Math.max(0, parseInt(e.target.value) || 0),
-                    })
-                  }
-                  inputProps={{ min: 0, max: 50 }}
-                  error={formData.deliveryRadius <= 0}
-                  helperText={
-                    formData.deliveryRadius <= 0
-                      ? 'Delivery radius must be greater than 0'
-                      : ''
-                  }
-                />
+                  label="Address Type"
+                  name="type"
+                  value={addressFormData.type}
+                  onChange={handleAddressInputChange}
+                  required
+                >
+                  <MenuItem value="home">Home</MenuItem>
+                  <MenuItem value="work">Work</MenuItem>
+                  <MenuItem value="other">Other</MenuItem>
+                </TextField>
               </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  fullWidth
-                  type="time"
-                  label="Opening Time"
-                  value={formData.operatingHours.open}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      operatingHours: {
-                        ...formData.operatingHours,
-                        open: e.target.value,
-                      },
-                    })
+              <Grid item xs={12}>
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      checked={addressFormData.isDefault}
+                      onChange={(e) => setAddressFormData(prev => ({
+                        ...prev,
+                        isDefault: e.target.checked
+                      }))}
+                      name="isDefault"
+                    />
                   }
-                  InputLabelProps={{ shrink: true }}
-                />
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  fullWidth
-                  type="time"
-                  label="Closing Time"
-                  value={formData.operatingHours.close}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      operatingHours: {
-                        ...formData.operatingHours,
-                        close: e.target.value,
-                      },
-                    })
-                  }
-                  InputLabelProps={{ shrink: true }}
-                  error={formData.operatingHours.close <= formData.operatingHours.open}
-                  helperText={
-                    formData.operatingHours.close <= formData.operatingHours.open
-                      ? 'Closing time must be after opening time'
-                      : ''
-                  }
+                  label="Set as default address"
                 />
               </Grid>
             </Grid>
           </Box>
-          {error && (
-            <Alert severity="error" sx={{ mt: 2 }}>
-              {error}
-            </Alert>
-          )}
         </DialogContent>
         <DialogActions>
-          <Button onClick={handleClose}>Cancel</Button>
           <Button
-            onClick={handleSubmit}
-            variant="contained"
+            onClick={() => {
+              setAddressDialog(false);
+              setEditingAddress(null);
+            }}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={handleAddressSubmit}
+            color="primary"
             disabled={loading}
           >
-            {loading ? (
-              <CircularProgress size={24} />
-            ) : selectedPharmacy ? (
-              'Save Changes'
-            ) : (
-              'Add Pharmacy'
-            )}
+            {loading ? <CircularProgress size={24} /> : (editingAddress ? 'Update' : 'Add')}
           </Button>
         </DialogActions>
       </Dialog>
 
-      <Snackbar
-        open={snackbar.open}
-        autoHideDuration={6000}
-        onClose={handleCloseSnackbar}
-        anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
-      >
-        <Alert 
-          onClose={handleCloseSnackbar} 
-          severity={snackbar.severity} 
-          sx={{ width: '100%' }}
-          variant="filled"
-        >
-          {snackbar.message}
-        </Alert>
-      </Snackbar>
+      {/* Password Change Dialog */}
+      <Dialog open={passwordDialog} onClose={() => setPasswordDialog(false)}>
+        <DialogTitle>Change Password</DialogTitle>
+        <DialogContent>
+          <Box component="form" onSubmit={handlePasswordSubmit} sx={{ mt: 2 }}>
+            <TextField
+              fullWidth
+              margin="normal"
+              label="Current Password"
+              name="currentPassword"
+              type="password"
+              value={passwordData.currentPassword}
+              onChange={handlePasswordChange}
+              required
+              autoComplete="current-password"
+            />
+            <TextField
+              fullWidth
+              margin="normal"
+              label="New Password"
+              name="newPassword"
+              type="password"
+              value={passwordData.newPassword}
+              onChange={handlePasswordChange}
+              required
+              autoComplete="new-password"
+            />
+            <TextField
+              fullWidth
+              margin="normal"
+              label="Confirm New Password"
+              name="confirmPassword"
+              type="password"
+              value={passwordData.confirmPassword}
+              onChange={handlePasswordChange}
+              required
+              autoComplete="new-password"
+            />
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setPasswordDialog(false)}>Cancel</Button>
+          <Button onClick={handlePasswordSubmit} color="primary" disabled={loading}>
+            {loading ? <CircularProgress size={24} /> : 'Change Password'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Container>
   );
 };
 
-export default PharmacyManagement; 
+export default Profile; 
