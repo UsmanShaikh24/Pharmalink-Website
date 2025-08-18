@@ -42,8 +42,8 @@ router.post('/', auth, [
   body('deliveryAddress.city').notEmpty(),
   body('deliveryAddress.state').notEmpty(),
   body('deliveryAddress.zipCode').notEmpty(),
-  body('deliveryAddress.coordinates.latitude').isFloat(),
-  body('deliveryAddress.coordinates.longitude').isFloat(),
+  body('deliveryAddress.coordinates.latitude').optional().isFloat(),
+  body('deliveryAddress.coordinates.longitude').optional().isFloat(),
   body('paymentMethod').isIn(['cod'])
 ], async (req, res) => {
   try {
