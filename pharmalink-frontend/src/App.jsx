@@ -67,35 +67,17 @@ function App() {
                     }
                   />
 
-                  {/* User routes */}
-                  <Route
-                    path="/"
-                    element={
-                      <ProtectedRoute adminRedirect>
-                        <Home />
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/search"
-                    element={
-                      <ProtectedRoute adminRedirect>
-                        <Search />
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/cart"
-                    element={
-                      <ProtectedRoute adminRedirect>
-                        <Cart />
-                      </ProtectedRoute>
-                    }
-                  />
+                  {/* Public routes - accessible to everyone */}
+                  <Route path="/" element={<Home />} />
+                  <Route path="/search" element={<Search />} />
+                  <Route path="/cart" element={<Cart />} />
+                  <Route path="/recommendations" element={<RecommendationSystem />} />
+
+                  {/* Protected routes - require authentication */}
                   <Route
                     path="/orders"
                     element={
-                      <ProtectedRoute adminRedirect>
+                      <ProtectedRoute>
                         <Orders />
                       </ProtectedRoute>
                     }
@@ -103,16 +85,11 @@ function App() {
                   <Route
                     path="/profile"
                     element={
-                      <ProtectedRoute adminRedirect>
+                      <ProtectedRoute>
                         <Profile />
                       </ProtectedRoute>
                     }
                   />
-                  <Route path="/recommendations" element={
-                    <ProtectedRoute>
-                      <RecommendationSystem />
-                    </ProtectedRoute>
-                  } />
                 </Routes>
               </Layout>
             </Router>
