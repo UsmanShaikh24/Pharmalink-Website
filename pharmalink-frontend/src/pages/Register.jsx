@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef } from 'react';
-import { useNavigate, Link as RouterLink } from 'react-router-dom';
+import { useState } from 'react';
+import { useNavigate, Link as RouterLink, useLocation } from 'react-router-dom';
 import {
   Box,
   Container,
@@ -18,8 +18,6 @@ import {
   useTheme,
   useMediaQuery,
   Fade,
-  CircularProgress,
-  Autocomplete,
 } from '@mui/material';
 import {
   Visibility,
@@ -36,11 +34,12 @@ const Register = () => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const navigate = useNavigate();
+  const location = useLocation();
   const { register } = useAuth();
-  const autocompleteInput = useRef(null);
-  const [placesService, setPlacesService] = useState(null);
-  const [addressPredictions, setAddressPredictions] = useState([]);
-  const [addressLoading, setAddressLoading] = useState(false);
+  
+  // Get redirect path and message from location state
+  const from = location.state?.from || '/';
+  const message = location.state?.message;
 
   // Form states
   const [activeStep, setActiveStep] = useState(0);
@@ -48,51 +47,7 @@ const Register = () => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const [addressInput, setAddressInput] = useState('');
-  const [scriptLoaded, setScriptLoaded] = useState(false);
-  const [scriptError, setScriptError] = useState(null);
 
-  // Initialize Google Places API
-  useEffect(() => {
-    // Check if script is already loaded
-    if (window.google && window.google.maps) {
-      setScriptLoaded(true);
-      const autocomplete = new window.google.maps.places.AutocompleteService();
-      const places = new window.google.maps.places.PlacesService(document.createElement('div'));
-      setPlacesService({ autocomplete, places });
-      return;
-    }
-
-    const script = document.createElement('script');
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${import.meta.env.VITE_GOOGLE_MAPS_API_KEY}&libraries=places`;
-    script.async = true;
-    
-    script.onload = () => {
-      setScriptLoaded(true);
-      try {
-        const autocomplete = new window.google.maps.places.AutocompleteService();
-        const places = new window.google.maps.places.PlacesService(document.createElement('div'));
-        setPlacesService({ autocomplete, places });
-      } catch (error) {
-        console.error('Error initializing Places service:', error);
-        setScriptError('Failed to initialize Places service');
-      }
-    };
-
-    script.onerror = (error) => {
-      console.error('Error loading Google Maps script:', error);
-      setScriptError('Failed to load Google Maps');
-    };
-
-    document.head.appendChild(script);
-
-    return () => {
-      const scriptElement = document.querySelector(`script[src*="maps.googleapis.com"]`);
-      if (scriptElement) {
-        document.head.removeChild(scriptElement);
-      }
-    };
-  }, []);
 
   // User form data
   const [formData, setFormData] = useState({
@@ -133,78 +88,7 @@ const Register = () => {
     }));
   };
 
-  const handleAddressSelect = (prediction) => {
-    if (!prediction || !placesService) return;
 
-    setAddressLoading(true);
-    placesService.places.getDetails(
-      {
-        placeId: prediction.place_id,
-        fields: ['address_components', 'formatted_address', 'geometry'],
-      },
-      (place, status) => {
-        setAddressLoading(false);
-        if (status === 'OK' && place) {
-          const addressComponents = place.address_components;
-          
-          // Extract address components for Indian format
-          const streetNumber = addressComponents.find(c => c.types.includes('street_number'))?.long_name || '';
-          const route = addressComponents.find(c => c.types.includes('route'))?.long_name || '';
-          const sublocality = addressComponents.find(c => c.types.includes('sublocality_level_1'))?.long_name || '';
-          const locality = addressComponents.find(c => c.types.includes('locality'))?.long_name || '';
-          const city = addressComponents.find(c => 
-            c.types.includes('administrative_area_level_2') || 
-            c.types.includes('locality')
-          )?.long_name;
-          const state = addressComponents.find(c => c.types.includes('administrative_area_level_1'))?.long_name;
-          const pinCode = addressComponents.find(c => c.types.includes('postal_code'))?.long_name;
-
-          // Combine street address components
-          const street = [streetNumber, route, sublocality, locality]
-            .filter(Boolean)
-            .join(', ');
-
-          const finalStreet = street || place.formatted_address;
-
-          setAddressInput(finalStreet);
-          setFormData(prev => ({
-            ...prev,
-            street: finalStreet,
-            city: city || '',
-            state: state || '',
-            zipCode: pinCode || '',
-          }));
-          setAddressPredictions([]);
-        }
-      }
-    );
-  };
-
-  const handleAddressSearch = (value) => {
-    setAddressInput(value);
-    
-    if (!value || !placesService) {
-      setAddressPredictions([]);
-      return;
-    }
-
-    placesService.autocomplete.getPlacePredictions(
-      {
-        input: value,
-        componentRestrictions: { country: 'IN' },
-        types: ['geocode', 'establishment'],
-        language: 'en',
-        region: 'IN',
-      },
-      (predictions, status) => {
-        if (status === 'OK' && predictions && predictions.length > 0) {
-          setAddressPredictions(predictions);
-        } else {
-          setAddressPredictions([]);
-        }
-      }
-    );
-  };
 
   const validateStep = () => {
     switch (activeStep) {
@@ -249,7 +133,7 @@ const Register = () => {
       };
 
       await register(userData);
-      navigate('/');
+      navigate(from);
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to create account');
     } finally {
@@ -378,77 +262,22 @@ const Register = () => {
         return (
           <Fade in={activeStep === 1}>
             <Box sx={{ mt: 3 }}>
-              {scriptError && (
-                <Alert severity="error" sx={{ mb: 2 }}>
-                  {scriptError}
-                </Alert>
-              )}
-              <Autocomplete
-                freeSolo
-                options={addressPredictions}
-                getOptionLabel={(option) => 
-                  typeof option === 'string' ? option : option.description
-                }
-                value={addressInput}
-                inputValue={addressInput}
-                onInputChange={(_, newValue, reason) => {
-                  if (reason === 'input') {
-                    handleAddressSearch(newValue);
-                  }
+              <TextField
+                margin="normal"
+                required
+                fullWidth
+                label="Street Address"
+                name="street"
+                value={formData.street}
+                onChange={handleInputChange}
+                placeholder="Enter your street address"
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <LocationOn />
+                    </InputAdornment>
+                  ),
                 }}
-                onChange={(_, newValue) => {
-                  if (typeof newValue === 'string') {
-                    setAddressInput(newValue);
-                    setFormData(prev => ({ ...prev, street: newValue }));
-                  } else if (newValue) {
-                    handleAddressSelect(newValue);
-                  }
-                }}
-                loading={addressLoading}
-                loadingText="Searching addresses..."
-                noOptionsText="No addresses found"
-                renderInput={(params) => (
-                  <TextField
-                    {...params}
-                    margin="normal"
-                    required
-                    fullWidth
-                    label="Street Address / Locality"
-                    name="street"
-                    placeholder="Start typing your address..."
-                    error={!!scriptError}
-                    helperText={scriptError || "Type to search for your address"}
-                    InputProps={{
-                      ...params.InputProps,
-                      startAdornment: (
-                        <InputAdornment position="start">
-                          <LocationOn />
-                        </InputAdornment>
-                      ),
-                      endAdornment: (
-                        <>
-                          {addressLoading ? (
-                            <CircularProgress color="inherit" size={20} />
-                          ) : null}
-                          {params.InputProps.endAdornment}
-                        </>
-                      ),
-                    }}
-                  />
-                )}
-                renderOption={(props, option) => (
-                  <li {...props}>
-                    <Box sx={{ display: 'flex', alignItems: 'flex-start' }}>
-                      <LocationOn sx={{ mt: 0.5, mr: 1, color: 'text.secondary' }} />
-                      <Box>
-                        <Typography variant="body1">{option.structured_formatting?.main_text}</Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          {option.structured_formatting?.secondary_text}
-                        </Typography>
-                      </Box>
-                    </Box>
-                  </li>
-                )}
               />
               <TextField
                 margin="normal"
@@ -520,6 +349,12 @@ const Register = () => {
         >
           Create Your Account
         </Typography>
+        
+        {message && (
+          <Alert severity="info" sx={{ width: '100%', mb: 3 }}>
+            {message}
+          </Alert>
+        )}
 
         {error && (
           <Alert severity="error" sx={{ width: '100%', mb: 3 }}>
