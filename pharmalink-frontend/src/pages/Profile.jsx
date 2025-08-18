@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Container,
   Paper,
@@ -23,7 +23,6 @@ import {
   Checkbox,
   Select,
   MenuItem,
-  Autocomplete,
   InputAdornment
 } from '@mui/material';
 import {
@@ -40,7 +39,6 @@ import {
 } from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext';
 import axiosInstance from '../utils/axios';
-import { initGoogleMaps, parseGoogleAddress, loadGoogleMaps } from '../utils/googleMaps';
 import { toast } from 'react-hot-toast';
 
 const Profile = () => {
@@ -51,16 +49,6 @@ const Profile = () => {
   const [passwordDialog, setPasswordDialog] = useState(false);
   const [addressDialog, setAddressDialog] = useState(false);
   const [editingAddress, setEditingAddress] = useState(null);
-  const autocompleteRef = useRef(null);
-  const googleAutocomplete = useRef(null);
-  const [addressInput, setAddressInput] = useState('');
-  const [autocompleteInstance, setAutocompleteInstance] = useState(null);
-  const [placesService, setPlacesService] = useState(null);
-  const [addressPredictions, setAddressPredictions] = useState([]);
-  const [addressLoading, setAddressLoading] = useState(false);
-  const [scriptLoaded, setScriptLoaded] = useState(false);
-  const [scriptError, setScriptError] = useState(null);
-  const mapRef = useRef(null);
 
   // Form states
   const [formData, setFormData] = useState({
@@ -79,11 +67,7 @@ const Profile = () => {
     state: '',
     zipCode: '',
     type: 'home',
-    isDefault: false,
-    coordinates: {
-      latitude: null,
-      longitude: null
-    }
+    isDefault: false
   });
 
   // Password change states
@@ -126,9 +110,9 @@ const Profile = () => {
           zipCode: editingAddress.zipCode || '',
           type: editingAddress.type || 'home',
           isDefault: editingAddress.isDefault || false,
-          coordinates: editingAddress.coordinates || { latitude: null, longitude: null }
+
         });
-        setAddressInput(editingAddress.street || '');
+
       } else {
         setAddressFormData({
           fullName: '',
@@ -141,139 +125,16 @@ const Profile = () => {
           zipCode: '',
           type: 'home',
           isDefault: false,
-          coordinates: {
-            latitude: null,
-            longitude: null
-          }
+
         });
-        setAddressInput('');
+
       }
     }
   }, [addressDialog, editingAddress]);
 
-  // Initialize Google Maps API
-  useEffect(() => {
-    let isMounted = true;
 
-    const initializePlacesService = () => {
-      if (!window.google?.maps?.places) {
-        setScriptError('Google Maps Places API failed to load');
-        return;
-      }
 
-      try {
-        if (!mapRef.current) {
-          mapRef.current = document.createElement('div');
-        }
 
-        const autocompleteService = new window.google.maps.places.AutocompleteService();
-        const placesService = new window.google.maps.places.PlacesService(mapRef.current);
-
-        if (isMounted) {
-          setPlacesService({
-            autocomplete: autocompleteService,
-            places: placesService
-          });
-          setScriptLoaded(true);
-          setScriptError(null);
-        }
-      } catch (error) {
-        console.error('Error initializing Places service:', error);
-        if (isMounted) {
-          setScriptError('Failed to initialize Places service');
-        }
-      }
-    };
-
-    const loadMapsLibrary = async () => {
-      try {
-        await loadGoogleMaps();
-        initializePlacesService();
-      } catch (error) {
-        console.error('Error loading Google Maps:', error);
-        setScriptError('Failed to load Google Maps. Please check your internet connection.');
-      }
-    };
-
-    loadMapsLibrary();
-
-    return () => {
-      isMounted = false;
-      if (mapRef.current) {
-        mapRef.current = null;
-      }
-    };
-  }, []);
-
-  const handleAddressSearch = (value) => {
-    if (!placesService?.autocomplete || !value) {
-      setAddressPredictions([]);
-      return;
-    }
-
-    setAddressLoading(true);
-    placesService.autocomplete.getPlacePredictions(
-      {
-        input: value,
-        componentRestrictions: { country: 'IN' },
-        types: ['address']
-      },
-      (predictions, status) => {
-        setAddressLoading(false);
-        if (status === 'OK' && predictions && predictions.length > 0) {
-          setAddressPredictions(predictions);
-        } else {
-          setAddressPredictions([]);
-        }
-      }
-    );
-  };
-
-  const handleAddressSelect = (prediction) => {
-    if (!prediction?.place_id || !placesService?.places) return;
-
-    setAddressLoading(true);
-    placesService.places.getDetails(
-      {
-        placeId: prediction.place_id,
-        fields: ['address_components', 'formatted_address', 'geometry'],
-      },
-      (place, status) => {
-        setAddressLoading(false);
-        if (status === 'OK' && place) {
-          const addressComponents = place.address_components || [];
-          
-          // Extract address components for Indian format
-          const streetNumber = addressComponents.find(c => c.types.includes('street_number'))?.long_name || '';
-          const route = addressComponents.find(c => c.types.includes('route'))?.long_name || '';
-          const sublocality = addressComponents.find(c => c.types.includes('sublocality_level_1'))?.long_name || '';
-          const locality = addressComponents.find(c => c.types.includes('locality'))?.long_name || '';
-          const city = addressComponents.find(c => 
-            c.types.includes('administrative_area_level_2') || 
-            c.types.includes('locality')
-          )?.long_name || locality || '';
-          const state = addressComponents.find(c => c.types.includes('administrative_area_level_1'))?.long_name || '';
-          const zipCode = addressComponents.find(c => c.types.includes('postal_code'))?.long_name || '';
-
-          const street = [streetNumber, route, sublocality].filter(Boolean).join(', ');
-
-          setAddressFormData(prev => ({
-            ...prev,
-            street: street || '',
-            city: city || '',
-            state: state || '',
-            zipCode: zipCode || '',
-            coordinates: place.geometry?.location ? {
-              latitude: place.geometry.location.lat(),
-              longitude: place.geometry.location.lng()
-            } : null
-          }));
-
-          setAddressInput(place.formatted_address || '');
-        }
-      }
-    );
-  };
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -755,55 +616,24 @@ const Profile = () => {
                 />
               </Grid>
               <Grid item xs={12}>
-                {scriptError ? (
-                  <Alert severity="error" sx={{ mb: 2 }}>
-                    {scriptError}
-                  </Alert>
-                ) : (
-                  <Autocomplete
-                    freeSolo
-                    options={addressPredictions}
-                    getOptionLabel={(option) => 
-                      typeof option === 'string' ? option : option.description
-                    }
-                    inputValue={addressInput}
-                    onInputChange={(event, value) => {
-                      setAddressInput(value);
-                      handleAddressSearch(value);
-                    }}
-                    onChange={(event, value) => {
-                      if (value && typeof value !== 'string') {
-                        handleAddressSelect(value);
-                      }
-                    }}
-                    loading={addressLoading}
-                    renderInput={(params) => (
-                      <TextField
-                        {...params}
-                        fullWidth
-                        label="Search Address"
-                        placeholder="Start typing your address..."
-                        required
-                        InputProps={{
-                          ...params.InputProps,
-                          startAdornment: (
-                            <InputAdornment position="start">
-                              <LocationOn sx={{ color: 'text.secondary' }} />
-                            </InputAdornment>
-                          ),
-                          endAdornment: (
-                            <>
-                              {addressLoading ? (
-                                <CircularProgress color="inherit" size={20} />
-                              ) : null}
-                              {params.InputProps.endAdornment}
-                            </>
-                          ),
-                        }}
-                      />
-                    )}
-                  />
-                )}
+                <TextField
+                  fullWidth
+                  label="Street Address"
+                  name="street"
+                  value={addressFormData.street}
+                  onChange={handleAddressInputChange}
+                  required
+                  placeholder="Enter your street address"
+                  error={fieldErrors.street}
+                  helperText={fieldErrors.street ? "Street address is required" : ""}
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <LocationOn sx={{ color: 'text.secondary' }} />
+                      </InputAdornment>
+                    ),
+                  }}
+                />
               </Grid>
               <Grid item xs={12}>
                 <TextField
