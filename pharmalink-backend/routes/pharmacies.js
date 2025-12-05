@@ -4,7 +4,7 @@ import {
   Box,
   Container,
   Typography,
-  const express = require('express');
+  import express from 'express';
   const router = express.Router();
 
   // Example: Register a pharmacy (POST /api/pharmacies/register)
@@ -22,5 +22,5 @@ import {
     res.json([]);
   });
 
-  module.exports = router;
+  export default router;
   Email,
