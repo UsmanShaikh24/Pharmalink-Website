@@ -1,441 +1,325 @@
-import { useState } from 'react';
-import { useNavigate, Link as RouterLink, useLocation } from 'react-router-dom';
-import {
-  Box,
-  Container,
-  Typography,
-  TextField,
-  Button,
-  Paper,
-  Link,
-  Alert,
-  Stepper,
-  Step,
-  StepLabel,
-  InputAdornment,
-  IconButton,
-  LinearProgress,
-  useTheme,
-  useMediaQuery,
-  Fade,
-} from '@mui/material';
-import {
-  Visibility,
-  VisibilityOff,
-  Person,
-  Email,
-  Phone,
-  LocationOn,
-  Lock,
-} from '@mui/icons-material';
-import { useAuth } from '../contexts/AuthContext';
+const express = require('express');
+const router = express.Router();
+const { auth, adminAuth } = require('../middleware/auth');
+const Pharmacy = require('../models/Pharmacy');
+const { body, validationResult } = require('express-validator');
 
-const Register = () => {
-  const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
-  const navigate = useNavigate();
-  const location = useLocation();
-  const { register } = useAuth();
-  
-  // Get redirect path and message from location state
-  const from = location.state?.from || '/';
-  const message = location.state?.message;
-
-  // Form states
-  const [activeStep, setActiveStep] = useState(0);
-  const [showPassword, setShowPassword] = useState(false);
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
-
-
-
-  // User form data
-  const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    password: '',
-    phoneNumber: '',
-    street: '',
-    city: '',
-    state: '',
-    zipCode: '',
-  });
-
-  // Password strength calculation
-  const calculatePasswordStrength = (password) => {
-    let strength = 0;
-    if (password.length >= 8) strength += 25;
-    if (password.match(/[a-z]/)) strength += 25;
-    if (password.match(/[A-Z]/)) strength += 25;
-    if (password.match(/[0-9!@#$%^&*]/)) strength += 25;
-    return strength;
-  };
-
-  const passwordStrength = calculatePasswordStrength(formData.password);
-
-  const getPasswordStrengthColor = () => {
-    if (passwordStrength <= 25) return theme.palette.error.main;
-    if (passwordStrength <= 50) return theme.palette.warning.main;
-    if (passwordStrength <= 75) return theme.palette.info.main;
-    return theme.palette.success.main;
-  };
-
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
-  };
-
-
-
-  const validateStep = () => {
-    switch (activeStep) {
-      case 0:
-        return formData.name && formData.email && formData.password && formData.phoneNumber;
-      case 1:
-        return formData.street && formData.city && formData.state && formData.zipCode;
-      default:
-        return true;
+// Create pharmacy (admin only)
+router.post('/', adminAuth, [
+  body('name').trim().notEmpty().withMessage('Pharmacy name is required'),
+  body('email').isEmail().normalizeEmail().withMessage('Valid email is required'),
+  body('licenseNumber').trim().notEmpty().withMessage('License number is required'),
+  body('contactNumber').trim().notEmpty().withMessage('Contact number is required'),
+  body('address').isObject().withMessage('Address is required'),
+  body('address.street').trim().notEmpty().withMessage('Street address is required'),
+  body('address.city').trim().notEmpty().withMessage('City is required'),
+  body('address.state').trim().notEmpty().withMessage('State is required'),
+  body('address.pinCode').trim().notEmpty().withMessage('PIN code is required'),
+  body('operatingHours').isObject().withMessage('Operating hours are required'),
+  body('operatingHours.open').notEmpty().withMessage('Opening time is required'),
+  body('operatingHours.close').notEmpty().withMessage('Closing time is required'),
+  body('deliveryRadius').isNumeric().withMessage('Delivery radius must be a number')
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
     }
-  };
 
-  const handleNext = () => {
-    if (validateStep()) {
-      setActiveStep((prev) => prev + 1);
+    const {
+      name,
+      email,
+      licenseNumber,
+      contactNumber,
+      address,
+      operatingHours,
+      deliveryRadius
+    } = req.body;
+
+    // Check if pharmacy with same email or license exists
+    const existingPharmacy = await Pharmacy.findOne({
+      $or: [
+        { email: email.toLowerCase() },
+        { licenseNumber }
+      ]
+    });
+
+    if (existingPharmacy) {
+      return res.status(400).json({
+        error: existingPharmacy.email === email.toLowerCase()
+          ? 'Email already registered'
+          : 'License number already registered'
+      });
     }
-  };
 
-  const handleBack = () => {
-    setActiveStep((prev) => prev - 1);
-  };
+    const pharmacy = new Pharmacy({
+      name,
+      email: email.toLowerCase(),
+      licenseNumber,
+      contactNumber,
+      address,
+      operatingHours,
+      deliveryRadius,
+      isActive: true,
+      isVerified: true, // Auto-verify when created by admin
+      role: 'pharmacy'
+    });
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!validateStep()) return;
+    await pharmacy.save();
+    res.status(201).json(pharmacy);
+  } catch (error) {
+    console.error('Error creating pharmacy:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
 
-    try {
-      setError('');
-      setLoading(true);
+// Get all pharmacies (public endpoint for guest users)
+router.get('/public', async (req, res) => {
+  try {
+    const pharmacies = await Pharmacy.find({ isActive: true })
+      .select('name address.city address.state isActive')
+      .limit(50); // Limit results for performance
+    res.json(pharmacies);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
 
-      const userData = {
-        name: formData.name,
-        email: formData.email,
-        password: formData.password,
-        phoneNumber: formData.phoneNumber,
-        address: {
-          street: formData.street,
-          city: formData.city,
-          state: formData.state,
-          zipCode: formData.zipCode,
-        },
-      };
+// Get all pharmacies (authenticated users get full data)
+router.get('/', async (req, res) => {
+  try {
+    const pharmacies = await Pharmacy.find({ isActive: true });
+    res.json(pharmacies);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
 
-      await register(userData);
-      navigate(from);
-    } catch (err) {
-      setError(err.response?.data?.error || 'Failed to create account');
-    } finally {
-      setLoading(false);
+// Get nearby pharmacies
+router.get('/nearby', async (req, res) => {
+  try {
+    const { latitude, longitude, radius = 5 } = req.query;
+    
+    if (!latitude || !longitude) {
+      return res.status(400).json({ error: 'Latitude and longitude are required' });
     }
-  };
 
-  const steps = [
-    'Basic Information',
-    'Address Details',
-  ];
+    const pharmacies = await Pharmacy.find({
+      isActive: true,
+      'address.coordinates': {
+        $near: {
+          $geometry: {
+            type: 'Point',
+            coordinates: [parseFloat(longitude), parseFloat(latitude)]
+          },
+          $maxDistance: radius * 1000 // Convert km to meters
+        }
+      }
+    });
 
-  const renderStepContent = (step) => {
-    switch (step) {
-      case 0:
-        return (
-          <Fade in={activeStep === 0}>
-            <Box sx={{ mt: 3 }}>
-              <TextField
-                margin="normal"
-                required
-                fullWidth
-                label="Full Name"
-                name="name"
-                value={formData.name}
-                onChange={handleInputChange}
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <Person />
-                    </InputAdornment>
-                  ),
-                }}
-              />
-              <TextField
-                margin="normal"
-                required
-                fullWidth
-                label="Email Address"
-                name="email"
-                type="email"
-                value={formData.email}
-                onChange={handleInputChange}
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <Email />
-                    </InputAdornment>
-                  ),
-                }}
-              />
-              <TextField
-                margin="normal"
-                required
-                fullWidth
-                label="Password"
-                name="password"
-                type={showPassword ? 'text' : 'password'}
-                value={formData.password}
-                onChange={handleInputChange}
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <Lock />
-                    </InputAdornment>
-                  ),
-                  endAdornment: (
-                    <InputAdornment position="end">
-                      <IconButton
-                        onClick={() => setShowPassword(!showPassword)}
-                        edge="end"
-                      >
-                        {showPassword ? <VisibilityOff /> : <Visibility />}
-                      </IconButton>
-                    </InputAdornment>
-                  ),
-                }}
-              />
-              {formData.password && (
-                <Box sx={{ mt: 1 }}>
-                  <LinearProgress
-                    variant="determinate"
-                    value={passwordStrength}
-                    sx={{
-                      height: 8,
-                      borderRadius: 4,
-                      backgroundColor: theme.palette.grey[200],
-                      '& .MuiLinearProgress-bar': {
-                        backgroundColor: getPasswordStrengthColor(),
-                      },
-                    }}
-                  />
-                  <Typography
-                    variant="caption"
-                    sx={{
-                      mt: 0.5,
-                      display: 'block',
-                      color: getPasswordStrengthColor(),
-                    }}
-                  >
-                    Password Strength: {passwordStrength}%
-                  </Typography>
-                </Box>
-              )}
-              <TextField
-                margin="normal"
-                required
-                fullWidth
-                label="Phone Number"
-                name="phoneNumber"
-                value={formData.phoneNumber}
-                onChange={handleInputChange}
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <Phone />
-                    </InputAdornment>
-                  ),
-                }}
-              />
-            </Box>
-          </Fade>
-        );
+    res.json(pharmacies);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
 
-      case 1:
-        return (
-          <Fade in={activeStep === 1}>
-            <Box sx={{ mt: 3 }}>
-              <TextField
-                margin="normal"
-                required
-                fullWidth
-                label="Street Address"
-                name="street"
-                value={formData.street}
-                onChange={handleInputChange}
-                placeholder="Enter your street address"
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <LocationOn />
-                    </InputAdornment>
-                  ),
-                }}
-              />
-              <TextField
-                margin="normal"
-                required
-                fullWidth
-                label="City / District"
-                name="city"
-                value={formData.city}
-                onChange={handleInputChange}
-                placeholder="Enter city or district name"
-              />
-              <TextField
-                margin="normal"
-                required
-                fullWidth
-                label="State"
-                name="state"
-                value={formData.state}
-                onChange={handleInputChange}
-                placeholder="Enter state name"
-              />
-              <TextField
-                margin="normal"
-                required
-                fullWidth
-                label="PIN Code"
-                name="zipCode"
-                value={formData.zipCode}
-                onChange={handleInputChange}
-                placeholder="Enter 6-digit PIN code"
-                inputProps={{
-                  maxLength: 6,
-                  pattern: '[0-9]*',
-                }}
-                helperText="Enter 6-digit Indian PIN code"
-              />
-            </Box>
-          </Fade>
-        );
-
-      default:
-        return null;
+// Get single pharmacy
+router.get('/:id', async (req, res) => {
+  try {
+    const pharmacy = await Pharmacy.findById(req.params.id);
+    if (!pharmacy) {
+      return res.status(404).json({ error: 'Pharmacy not found' });
     }
-  };
+    res.json(pharmacy);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
 
-  return (
-    <Container component="main" maxWidth="sm">
-      <Paper
-        elevation={3}
-        sx={{
-          mt: { xs: 2, sm: 4, md: 8 },
-          p: { xs: 2, sm: 3, md: 4 },
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          borderRadius: 2,
-          backgroundColor: 'background.paper',
-        }}
-      >
-        <Typography
-          component="h1"
-          variant="h4"
-          sx={{
-            mb: 4,
-            fontWeight: 600,
-            color: 'primary.main',
-            textAlign: 'center',
-          }}
-        >
-          Create Your Account
-        </Typography>
-        
-        {message && (
-          <Alert severity="info" sx={{ width: '100%', mb: 3 }}>
-            {message}
-          </Alert>
-        )}
+// Update pharmacy (only by pharmacy owner or admin)
+router.patch('/:id', auth, [
+  body('name').optional().trim().notEmpty(),
+  body('email').optional().isEmail().normalizeEmail(),
+  body('contactNumber').optional().notEmpty(),
+  body('address').optional().isObject(),
+  body('operatingHours').optional().isObject(),
+  body('deliveryRadius').optional().isNumeric()
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
 
-        {error && (
-          <Alert severity="error" sx={{ width: '100%', mb: 3 }}>
-            {error}
-          </Alert>
-        )}
+    const pharmacy = await Pharmacy.findById(req.params.id);
+    if (!pharmacy) {
+      return res.status(404).json({ error: 'Pharmacy not found' });
+    }
 
-        <Stepper
-          activeStep={activeStep}
-          alternativeLabel={!isMobile}
-          orientation={isMobile ? 'vertical' : 'horizontal'}
-          sx={{ width: '100%', mb: 4 }}
-        >
-          {steps.map((label) => (
-            <Step key={label}>
-              <StepLabel>{label}</StepLabel>
-            </Step>
-          ))}
-        </Stepper>
+    // Check if user is pharmacy owner or admin
+    if (req.user._id.toString() !== pharmacy._id.toString() && req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Not authorized' });
+    }
 
-        <Box
-          component="form"
-          onSubmit={handleSubmit}
-          sx={{ width: '100%' }}
-        >
-          {renderStepContent(activeStep)}
+    const updates = Object.keys(req.body);
+    updates.forEach(update => pharmacy[update] = req.body[update]);
+    await pharmacy.save();
 
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 4 }}>
-            <Button
-              onClick={handleBack}
-              disabled={activeStep === 0}
-              sx={{
-                mr: 1,
-                '&.Mui-disabled': {
-                  opacity: 0,
-                },
-              }}
-            >
-              Back
-            </Button>
-            <Box sx={{ flex: '1 1 auto' }} />
-            {activeStep === steps.length - 1 ? (
-              <Button
-                type="submit"
-                variant="contained"
-                disabled={loading || !validateStep()}
-                sx={{
-                  minWidth: 120,
-                  borderRadius: '20px',
-                  textTransform: 'none',
-                  fontWeight: 600,
-                }}
-              >
-                {loading ? 'Creating Account...' : 'Create Account'}
-              </Button>
-            ) : (
-              <Button
-                variant="contained"
-                onClick={handleNext}
-                disabled={!validateStep()}
-                sx={{
-                  minWidth: 100,
-                  borderRadius: '20px',
-                  textTransform: 'none',
-                  fontWeight: 600,
-                }}
-              >
-                Next
-              </Button>
-            )}
-          </Box>
-        </Box>
+    res.json(pharmacy);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
 
-        <Box sx={{ mt: 3, textAlign: 'center' }}>
-          <Link component={RouterLink} to="/login" variant="body2">
-            Already have an account? Sign in
-          </Link>
-        </Box>
-      </Paper>
-    </Container>
-  );
-};
+// Verify pharmacy (admin only)
+router.patch('/:id/verify', adminAuth, async (req, res) => {
+  try {
+    const pharmacy = await Pharmacy.findById(req.params.id);
+    if (!pharmacy) {
+      return res.status(404).json({ error: 'Pharmacy not found' });
+    }
 
-export default Register; 
+    pharmacy.isVerified = true;
+    await pharmacy.save();
+
+    res.json(pharmacy);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+// Deactivate pharmacy (admin only)
+router.patch('/:id/deactivate', adminAuth, async (req, res) => {
+  try {
+    const pharmacy = await Pharmacy.findById(req.params.id);
+    if (!pharmacy) {
+      return res.status(404).json({ error: 'Pharmacy not found' });
+    }
+
+    pharmacy.isActive = false;
+    await pharmacy.save();
+
+    res.json(pharmacy);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+// Get pharmacy reviews
+router.get('/:id/reviews', async (req, res) => {
+  try {
+    const pharmacy = await Pharmacy.findById(req.params.id)
+      .select('reviews')
+      .populate('reviews.userId', 'name');
+    
+    if (!pharmacy) {
+      return res.status(404).json({ error: 'Pharmacy not found' });
+    }
+
+    res.json(pharmacy.reviews);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Add pharmacy review
+router.post('/:id/reviews', auth, [
+  body('rating').isInt({ min: 1, max: 5 }),
+  body('comment').optional().trim()
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    const pharmacy = await Pharmacy.findById(req.params.id);
+    if (!pharmacy) {
+      return res.status(404).json({ error: 'Pharmacy not found' });
+    }
+
+    const review = {
+      userId: req.user._id,
+      rating: req.body.rating,
+      comment: req.body.comment
+    };
+
+    pharmacy.reviews.push(review);
+    
+    // Update average rating
+    const totalRating = pharmacy.reviews.reduce((sum, review) => sum + review.rating, 0);
+    pharmacy.rating = totalRating / pharmacy.reviews.length;
+    
+    await pharmacy.save();
+
+    res.status(201).json(review);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+// Delete pharmacy (admin only)
+router.delete('/:id', adminAuth, async (req, res) => {
+  try {
+    const pharmacy = await Pharmacy.findById(req.params.id);
+    if (!pharmacy) {
+      return res.status(404).json({ error: 'Pharmacy not found' });
+    }
+
+    await Pharmacy.findByIdAndDelete(req.params.id);
+    res.json({ message: 'Pharmacy deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting pharmacy:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Update pharmacy (admin only)
+router.put('/:id', adminAuth, [
+  body('name').optional().trim().notEmpty().withMessage('Pharmacy name cannot be empty'),
+  body('email').optional().isEmail().normalizeEmail().withMessage('Valid email is required'),
+  body('licenseNumber').optional().trim().notEmpty().withMessage('License number cannot be empty'),
+  body('contactNumber').optional().trim().notEmpty().withMessage('Contact number cannot be empty'),
+  body('address').optional().isObject().withMessage('Address must be an object'),
+  body('operatingHours').optional().isObject().withMessage('Operating hours must be an object'),
+  body('deliveryRadius').optional().isNumeric().withMessage('Delivery radius must be a number')
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    const pharmacy = await Pharmacy.findById(req.params.id);
+    if (!pharmacy) {
+      return res.status(404).json({ error: 'Pharmacy not found' });
+    }
+
+    // Check email uniqueness if being updated
+    if (req.body.email && req.body.email.toLowerCase() !== pharmacy.email) {
+      const existingPharmacy = await Pharmacy.findOne({ email: req.body.email.toLowerCase() });
+      if (existingPharmacy) {
+        return res.status(400).json({ error: 'Email already registered' });
+      }
+    }
+
+    // Check license number uniqueness if being updated
+    if (req.body.licenseNumber && req.body.licenseNumber !== pharmacy.licenseNumber) {
+      const existingPharmacy = await Pharmacy.findOne({ licenseNumber: req.body.licenseNumber });
+      if (existingPharmacy) {
+        return res.status(400).json({ error: 'License number already registered' });
+      }
+    }
+
+    const updates = Object.keys(req.body);
+    updates.forEach(update => pharmacy[update] = req.body[update]);
+    
+    await pharmacy.save();
+    res.json(pharmacy);
+  } catch (error) {
+    console.error('Error updating pharmacy:', error);
+    res.status(400).json({ error: error.message });
+  }
+});
+
+module.exports = router; 
