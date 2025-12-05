@@ -2,7 +2,7 @@ import axios from 'axios';
 
 // Create axios instance with custom config
 const instance = axios.create({
-  baseURL: 'http://localhost:5000',
+  baseURL: 'https://pharmalink-website.onrender.com',
   timeout: 10000,
   headers: {
     'Content-Type': 'application/json'
