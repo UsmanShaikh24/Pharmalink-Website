@@ -140,7 +140,7 @@ const RecommendationSystem = () => {
     const fetchInitialMedicines = async () => {
       try {
         const token = localStorage.getItem('token');
-        const baseURL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+        const baseURL = import.meta.env.VITE_API_URL || 'https://pharmalink-website.onrender.com';
         
         let response;
         if (token) {
@@ -196,7 +196,7 @@ const RecommendationSystem = () => {
 
     try {
       const token = localStorage.getItem('token');
-      const baseURL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+      const baseURL = import.meta.env.VITE_API_URL || 'https://pharmalink-website.onrender.com';
       
       let config = {};
       let endpointPrefix = '';

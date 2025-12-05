@@ -281,7 +281,7 @@ const Cart = () => {
 
       console.log('Order data being sent:', orderData);
 
-      const response = await axios.post('http://localhost:5000/api/orders', orderData, {
+      const response = await axios.post('https://pharmalink-website.onrender.com/api/orders', orderData, {
         headers: { 
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json'

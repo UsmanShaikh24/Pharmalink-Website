@@ -2,7 +2,7 @@ import { createContext, useContext, useState, useEffect } from 'react';
 import axios from 'axios';
 
 // Configure axios defaults
-const baseURL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+const baseURL = import.meta.env.VITE_API_URL || 'https://pharmalink-website.onrender.com';
 axios.defaults.baseURL = baseURL;
 
 const AuthContext = createContext();

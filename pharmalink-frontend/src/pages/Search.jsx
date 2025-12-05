@@ -291,7 +291,7 @@ const Search = () => {
       const token = localStorage.getItem('token');
       if (!token) return null;
       
-      const response = await axios.get(`http://localhost:5000/api/pharmacies/${pharmacyId}`, {
+      const response = await axios.get(`https://pharmalink-website.onrender.com/api/pharmacies/${pharmacyId}`, {
         headers: {
           Authorization: `Bearer ${token}`
         }
@@ -368,14 +368,14 @@ const Search = () => {
       const params = new URLSearchParams(requestParams);
       
       // Use different endpoints based on authentication status
-      let endpoint = 'http://localhost:5000/api/medicines';
+      let endpoint = 'https://pharmalink-website.onrender.com/api/medicines';
       const headers = {};
       
       if (token) {
         headers.Authorization = `Bearer ${token}`;
       } else {
         // Use public endpoint for non-authenticated users
-        endpoint = 'http://localhost:5000/api/medicines/browse';
+        endpoint = 'https://pharmalink-website.onrender.com/api/medicines/browse';
       }
       
       const response = await axios.get(endpoint, {
@@ -418,7 +418,7 @@ const Search = () => {
       return;
     }
     try {
-      const response = await axios.get('http://localhost:5000/api/medicines/suggestions', {
+      const response = await axios.get('https://pharmalink-website.onrender.com/api/medicines/suggestions', {
         params: { search: input }
       });
       if (response.data && Array.isArray(response.data.suggestions)) {
@@ -565,7 +565,7 @@ const Search = () => {
       let response;
       if (token) {
         // Authenticated users get full pharmacy data
-        response = await axios.get('http://localhost:5000/api/pharmacies', {
+        response = await axios.get('https://pharmalink-website.onrender.com/api/pharmacies', {
           headers: {
             Authorization: `Bearer ${token}`
           }
@@ -573,11 +573,11 @@ const Search = () => {
       } else {
         // Guest users get public pharmacy data
         try {
-          response = await axios.get('http://localhost:5000/api/pharmacies/public');
+          response = await axios.get('https://pharmalink-website.onrender.com/api/pharmacies/public');
         } catch (error) {
           // If public endpoint doesn't exist, fall back to main endpoint
           console.log("Public endpoint not available, trying main endpoint");
-          response = await axios.get('http://localhost:5000/api/pharmacies');
+          response = await axios.get('https://pharmalink-website.onrender.com/api/pharmacies');
         }
       }
 

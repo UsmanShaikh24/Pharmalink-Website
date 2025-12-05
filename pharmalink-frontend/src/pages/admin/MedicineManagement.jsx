@@ -42,7 +42,7 @@ import axios from 'axios';
 import { format, isValid, parseISO } from 'date-fns';
 
 // Configure axios
-axios.defaults.baseURL = 'http://localhost:5000';
+axios.defaults.baseURL = 'https://pharmalink-website.onrender.com';
 axios.defaults.headers.common['Content-Type'] = 'application/json';
 
 const MedicineManagement = () => {
